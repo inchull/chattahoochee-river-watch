@@ -69,6 +69,7 @@ ul.reasons li{display:flex;gap:8px;align-items:flex-start}
 #chart{touch-action:pan-y;cursor:crosshair;display:block}
 .readout{position:absolute;top:6px;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.45;box-shadow:0 2px 8px color-mix(in srgb,var(--ink) 15%,transparent);white-space:nowrap;font-variant-numeric:tabular-nums}
 .readout b{font-weight:600}
+td.when{white-space:nowrap;font-size:12.5px;width:1%;padding-right:12px}
 .readout .t{font-weight:600;margin-bottom:2px}
 .readout i{display:inline-block;width:9px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
 @media (max-width:559px){
@@ -325,7 +326,7 @@ function render(S){
   } else status='No release in the last 48 hours. River at base flow.';
   $('sub').textContent=`Launching from ${LP.name} · ${(LP.km/1.609).toFixed(1)} river miles below Buford Dam`;
   $('playTitle').textContent=`How a release plays out at ${where}`;
-  const row=(w,t)=>`<tr><td class="mono">${w}</td><td>${t}</td></tr>`, hh=x=>x<0.1?'right away':'+'+x.toFixed(1)+' h';
+  const row=(w,t)=>w===''?`<tr><td colspan="2" class="foot">${t}</td></tr>`:`<tr><td class="mono when">${w}</td><td>${t}</td></tr>`, hh=x=>x<0.1?'right away':'+'+x.toFixed(1)+' h';
   $('playBody').innerHTML=[
     row(hh(p.rise),'Water starts rising. Get out of the river if you’re wading.'),
     row('+'+p.peak.toFixed(1)+' h',`Peak, about ${p.ft.toFixed(1)} ft above low water`),

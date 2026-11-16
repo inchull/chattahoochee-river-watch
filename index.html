@@ -198,7 +198,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 
   <section class="panel" id="driftPage" hidden>
     <h2>Drift calculator</h2>
-    <p class="foot">Pick a put-in and a take-out to see how long the drift takes and what water you’ll be on. Drift speed is about 1 mph in normal water and about 1.8 mph on release water, based on how fast releases travel between USGS gauges. Stopping to fish adds time.</p>
+    <p class="foot">Pick a put-in and a take-out to see how long the drift takes and what water you’ll be on. Drift speed depends on the stretch and the water: roughly 1.5 mph from the dam to McGinnis, 1 mph through the middle river, slower on the lake above Morgan Falls, and faster on release water. Calibrated to how fast releases travel between USGS gauges and to a real dam-to-McGinnis drift, set slightly slow to allow for fishing.</p>
     <div class="tripctl">
       <label>Put in<select id="dFrom"></select></label>
       <label>Take out<select id="dTo"></select></label>
@@ -625,7 +625,7 @@ function simulateDrift(from,to,T,ctx){
     if(r){ if(r.dark) dark=true; sum+=r.q; n++; }
     if(s){ const isHi=s.water==='high'||s.water==='caution'; if(isHi) hi++; if(isHi&&prev===false&&!hit) hit={t,km}; prev=isHi;
       if(s.turb!=null&&s.turb>=15) muddy=true; if(s.ec!=null&&s.ec>=235) ecHi=true; }
-    km+=DRIFT_KMH[s?s.water:'low']*step/H; t+=step;
+    km+=driftKmh(km,s?s.water:null)*step/H; t+=step;
   }
   pts.push({t,km:Math.min(km,to.km)});
   return {pts,end:t,hours:(t-T)/H,score:n?Math.round(sum/n):null,hiShare:n?hi/n:0,hit,dark,muddy,ecHi,done:km>=to.km};
@@ -860,6 +860,16 @@ const poolOf=L=>LAUNCHES.filter(x=>x.pool===L.pool);
 // (about 3.9 km/h Medlock to Roswell, 5.3 km/h McGinnis to Medlock); the water under a boat moves
 // roughly 1/1.5 as fast as that front. Low water about 1 mph, release water about 1.8 mph.
 const DRIFT_KMH={low:1.6,falling:2.0,caution:2.4,high:2.9};
+// The current isn't the same everywhere, so drift speed is scaled by stretch:
+//  - dam to McGinnis Ferry: steeper, shoaly; releases cross it at 6-8 km/h. Calibrated to an
+//    actual fishing drift, dam to McGinnis in about 6 h; set slightly slower (about 6.5 h) to err long.
+//  - McGinnis to Island Ford: the slow middle river (the base speeds above).
+//  - Island Ford to Morgan Falls Dam: Bull Sluice Lake backs up the water, so slower still.
+//  - below Morgan Falls Dam: brisker, Class I shoals (published: dam to Paces Mill about 2.5-3 h paddling).
+function driftKmh(km,water){
+  const f= km<16 ? 1.47 : km<47.3 ? 1.0 : km<58.7 ? 0.8 : 1.25;
+  return DRIFT_KMH[water||'low']*f;
+}
 const MED_KM=29.7;
 // Net upstream speed: a prop boat about 8 mph, a jet boat about 20 mph
 const motorKmh=()=>TRIP.boat==='jet'?32:13;
@@ -974,7 +984,7 @@ function driftScore(T,ctx,sunT){
         prev=hi; if(r.s.turb!=null&&r.s.turb>=15) flags.muddy=true; }
       sum+=r.q;n++;
     }
-    km+=(DRIFT_KMH[r&&r.s?r.s.water:'low'])*step/H; t+=step;
+    km+=driftKmh(km,r&&r.s?r.s.water:null)*step/H; t+=step;
   }
   if(!n) return {score:null};
   flags.hours=(t-T)/H; flags.hiShare=(flags.hiN||0)/n;

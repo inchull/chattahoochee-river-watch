@@ -141,6 +141,11 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 .badge{display:inline-block;font:600 11px var(--f-body);letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;margin-right:6px;vertical-align:1px}
 .badge.trailer{color:var(--good)}.badge.hand{color:var(--river)}.badge.check{color:var(--warn)}
 .rampinfo .warn{color:var(--bad);font-weight:600}
+.tripctl.top #launchLbl{flex-basis:100%}
+.tripctl.top #launchLbl select{width:100%;max-width:420px}
+.tripctl.top label:not(#launchLbl){flex:1 1 0;min-width:0;max-width:170px}
+.tripctl.top label:not(#launchLbl) select{width:100%}
+@media (max-width:420px){.tripctl.top label:not(#launchLbl) select{font-size:13px;padding-left:8px;padding-right:26px;background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%}}
 .tripctl.top{grid-column:1/-1;margin:0 0 4px;padding-bottom:12px;border-bottom:1px solid var(--line)}
 .tripctl label{display:grid;gap:3px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .tripctl select:disabled{opacity:.55}
@@ -187,9 +192,9 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 
   <section class="panel verdict" aria-live="polite">
     <div class="tripctl top">
-      <label>Boat<select id="tBoat"><option value="prop">Prop motor</option><option value="jet">Jet boat</option><option value="drift">Drift boat</option><option value="wade">Wading</option></select></label>
-      <label>Launch from<select id="tLaunch"></select></label>
-      <label id="motorLbl">Motor up<select id="tMotor"><option value="0">0 (drift only)</option><option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">1 h</option><option value="90">1.5 h</option></select></label>
+      <label id="launchLbl">Launch from<select id="tLaunch"></select></label>
+      <label>Boat<select id="tBoat"><option value="prop">Prop</option><option value="jet">Jet</option><option value="drift">Drift boat</option><option value="wade">Wading</option></select></label>
+      <label id="motorLbl">Motor up<select id="tMotor"><option value="0">0 (drift)</option><option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">1 h</option><option value="90">1.5 h</option></select></label>
       <label id="takeLbl" hidden>Take out at<select id="tTake"></select></label>
       <label id="floatLbl">Float back<select id="tFloat"><option value="0">—</option><option value="1">1 h</option><option value="2">2 h</option><option value="3">3 h</option><option value="3.5">3.5 h</option><option value="4">4 h</option><option value="4.5">4.5 h</option><option value="5">5 h</option></select></label>
     </div>

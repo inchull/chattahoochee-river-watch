@@ -232,11 +232,6 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
     <div class="legend"><span><i style="background:var(--river)"></i>Medlock stage (ft)</span><span><i style="background:var(--dam)"></i>Dam outflow (cfs)</span><span><i style="background:var(--turb)"></i>Turbidity (FNU)</span><span><i style="background:var(--ecoli)"></i>E. coli (line = 235 limit)</span></div>
   </section>
 
-  <section class="panel season">
-    <h2 id="seasonTitle">Trout this month</h2>
-    <div id="season"></div>
-  </section>
-
   <section class="panel">
     <h2 id="playTitle">How a release plays out</h2>
     <table>
@@ -244,6 +239,11 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
       <tbody id="playBody"></tbody>
     </table>
     <p class="foot">Measured from about 45 releases, Sept 17 to Nov 16 2026, at USGS gauges at the dam (02334430), below the dam near GA 20 (02334500), above McGinnis Ferry (02334653), and Medlock (02335000). Settles Bridge, McGinnis Ferry and Abbotts Bridge are interpolated by river distance. Clarity, E. coli and temperature are measured only at Medlock.</p>
+  </section>
+
+  <section class="panel season">
+    <h2 id="seasonTitle">Trout this month</h2>
+    <div id="season"></div>
   </section>
 
   <p class="foot">Data: USGS gauges <a href="https://waterdata.usgs.gov/monitoring-location/02335000/" target="_blank" rel="noopener">02335000 Norcross/Medlock</a>, <a href="https://waterdata.usgs.gov/monitoring-location/02334430/" target="_blank" rel="noopener">02334430 Buford Dam</a>, <a href="https://waterdata.usgs.gov/monitoring-location/02334653/" target="_blank" rel="noopener">02334653 Settles Bridge</a>. E. coli is the USGS BacteriALERT estimate from turbidity, not a lab count. Planned release schedule: call the Corps at <span class="mono">770-945-1466</span> or <span class="mono">855-326-3569</span>. Releases can start without warning. Check GA DNR for current regulations.<br><span id="updated"></span></p>

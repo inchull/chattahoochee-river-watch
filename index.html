@@ -84,7 +84,7 @@ ul.reasons li{display:flex;gap:8px;align-items:flex-start}
 @media(min-width:560px){.dsum{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .dsum .tile{background:var(--bg)}
 h3.sub{font:700 15px/1.2 var(--f-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 4px}
-.mapRead{position:static;display:block;margin-top:6px;box-shadow:none;white-space:normal}
+.readout.mapRead{position:static;display:block;margin-top:6px;box-shadow:none;white-space:normal}
 #mapRead{position:static;display:block;margin-top:6px;box-shadow:none;white-space:normal}
 #chart{touch-action:pan-y;cursor:crosshair;display:block}
 .readout{position:absolute;top:6px;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.45;box-shadow:0 2px 8px color-mix(in srgb,var(--ink) 15%,transparent);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -216,7 +216,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 
   <section class="panel">
     <h2 id="mapTitle">Where the good water is</h2>
-    <p class="foot">Each row is a spot on the river, top is the dam, and each column is 15 minutes. Blue is release water moving downstream; green is good fishing water. With a fast boat, stay in the green: fish ahead of the blue band, then run back up behind it. Below Morgan Falls Dam, Georgia Power runs its own release schedule (404-329-1455), so that band uses the Atlanta gauge’s actual readings and is a rougher forecast. Tap the map for details.</p>
+    <p class="foot">Each row is a spot on the river, top is the dam, and each column is 15 minutes. Blue is release water moving downstream; green is good fishing water. With a fast boat, stay in the green: fish ahead of the blue band, then run back up behind it. Below Morgan Falls Dam, past hours use the Atlanta gauge’s readings and future hours follow Georgia Power’s Morgan Falls turbine schedule (2+ units shows as release water, 1 unit as partly raised). Tap the map for details.</p>
     <div class="mapwrap"><svg id="rmap" class="rmap" viewBox="0 0 640 440" width="100%" role="img" aria-label="Fishing quality by river location and time of day"></svg><div class="readout mapRead" id="mapRead" hidden></div></div>
     <div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:color-mix(in srgb,var(--river) 45%,var(--panel))"></i>Rising or falling</span></div>
   </section>
@@ -507,15 +507,20 @@ function renderMap(ctx,o={}){
     g+=`<line x1="${x}" x2="${x}" y1="${T+h}" y2="${T+h+4}" stroke="var(--muted)"/>`;
   }
   if(isToday && +now>t0 && +now<t1){ const x=X(+now);
-    g+=`<line x1="${x}" x2="${x}" y1="${T}" y2="${T+h}" stroke="var(--ink)" stroke-width="1.5"/><text x="${x+3}" y="${T+10}" style="fill:var(--ink);font-weight:600">now</text>`; }
+    g+=`<line x1="${x}" x2="${x}" y1="${T}" y2="${T+h}" stroke="var(--ink)" stroke-width="1.5"/><text x="${x+3}" y="${T+h-4}" style="fill:var(--ink);font-weight:600;paint-order:stroke;stroke:var(--panel);stroke-width:3px">now</text>`; }
   if(o.path&&o.path.length){
     const pts=o.path.filter(p=>p.t>=t0&&p.t<=t1).map(p=>`${X(p.t).toFixed(1)},${Y(p.km).toFixed(1)}`).join(' ');
     const a=o.path[0], z=o.path[o.path.length-1];
     g+=`<polyline points="${pts}" fill="none" stroke="var(--panel)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
     g+=`<polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
     for(const [p,lab] of [[a,'Put in'],[z,'Take out']]) if(p.t>=t0&&p.t<=t1){
-      g+=`<circle cx="${X(p.t)}" cy="${Y(p.km)}" r="5" fill="var(--ink)" stroke="var(--panel)" stroke-width="2"/>`;
-      g+=`<text x="${X(p.t)+(X(p.t)>L+w-70?-8:8)}" y="${Y(p.km)+(lab==='Put in'?-7:14)}" text-anchor="${X(p.t)>L+w-70?'end':'start'}" style="fill:var(--ink);font-weight:600">${lab} ${fmtH(p.t)}</text>`;
+      const cx=X(p.t), cy=Y(p.km), right=cx>L+w-90;
+      // keep labels inside the plot: below the dot near the top edge, above it near the bottom
+      let ly=lab==='Put in'?cy-8:cy+15; if(ly<T+12) ly=cy+15; if(ly>T+h-4) ly=cy-8;
+      g+=`<circle cx="${cx}" cy="${cy}" r="5" fill="var(--ink)" stroke="var(--panel)" stroke-width="2"/>`;
+      g+=`<text x="${cx+(right?-9:9)}" y="${ly}" text-anchor="${right?'end':'start'}" style="fill:var(--ink);font-weight:600;paint-order:stroke;stroke:var(--panel);stroke-width:3px">${lab} ${fmtH(p.t)}</text>`;
+    } else if(p===z && z.t>t1){
+      g+=`<text x="${L+w-6}" y="${Math.min(Math.max(Y(z.km)-6,T+12),T+h-4)}" text-anchor="end" style="fill:var(--ink);font-weight:600;paint-order:stroke;stroke:var(--panel);stroke-width:3px">Take out ${fmtH(z.t)} (after dark) →</text>`;
     }
   }
   g+=`<rect class="mapSel" width="${cw}" height="${rh}" fill="none" stroke="var(--ink)" stroke-width="1.5" style="display:none"/>`;
@@ -657,13 +662,24 @@ function renderSeason(now){
 }
 
 // ---------- Fishing windows ----------
-let LAST=null, SCHED=null;
+let LAST=null, SCHED=null, MF=null;
 const SLOT=30*60e3;
 // Release effect at Medlock (measured, 36 clean releases): too high to wade from on+5h until off+12h; settled by off+15h
 const M={caution:4.5, high:5, wadeAfterOff:12, settleAfterOff:15, mwRelease:20};
 async function loadSchedule(){
   try{const r=await fetch('data/schedule.json',{cache:'no-store'}); if(!r.ok) throw 0; SCHED=await r.json();}
   catch(e){SCHED=null}
+  try{const r=await fetch('data/morganfalls.json',{cache:'no-store'}); if(!r.ok) throw 0; MF=await r.json();}
+  catch(e){MF=null}
+}
+// Morgan Falls turbine units in effect at time t (Eastern), from Georgia Power's tentative schedule; null if unknown
+function mfUnits(t){
+  if(!MF||!MF.schedule) return null; let best=null;
+  for(const [day,hrs] of Object.entries(MF.schedule)) for(const [hm,u] of Object.entries(hrs)){
+    const [y,m,d]=day.split('-').map(Number), [hh,mm]=hm.split(':').map(Number), ts=+new Date(y,m-1,d,hh,mm);
+    if(ts<=t && (!best||ts>best.ts)) best={ts,u};
+  }
+  return best && t-best.ts<36*H ? best.u : null;
 }
 function schedReleases(){
   // Contiguous hours at >= 20 MW are a release (minimum flow runs 4-7 MW)
@@ -747,7 +763,10 @@ function stateAt(km,t,ctx){
   } else if(lower && t<=+now && ctx.baseAtl!=null){
     // Below Morgan Falls Dam: use what the Atlanta gauge actually measured (Morgan Falls re-times releases)
     const v=valAt(atl,t+(PROFILE[PROFILE.length-1].rise-p.rise)*H) ?? valAt(atl,t); if(v==null) return null;
-    water = v<=ctx.baseAtl+0.4?'low': v<=ctx.baseAtl+0.7?'falling':'high';
+    water = v<=ctx.baseAtl+0.25?'low': v<=ctx.baseAtl+0.5?'falling':'high';
+  } else if(lower && t>+now && mfUnits(t-(km-59.1)*0.18*H)!=null){
+    // Below Morgan Falls, future hours follow Georgia Power's turbine schedule (about 0.18 h per km to travel down)
+    const u=mfUnits(t-(km-59.1)*0.18*H); water=u>=2?'high':u===1?'falling':'low';
   } else {
     for(const r of rel){
       const on=+r.on, off=+(r.off||new Date(on+2.5*H));
@@ -1008,6 +1027,8 @@ function rampInfoHTML(list,boat,day){
   for(const L of list) if(trailered&&L.ramp==='hand') out.push(`<span class="warn">${L.name} is hand-carry only, so a ${boat==='drift'?'drift boat on a trailer':'motor boat'} can’t launch or take out there.</span>`);
   if(list.some(L=>L.pool==='lower')){
     const dh=inDH(day||new Date());
+    if(MF&&MF.current){ const c=MF.current, sch=Object.entries(MF.schedule||{}).filter(([d])=>d>=dayKey(new Date())).map(([d,h])=>Object.entries(h).map(([hm,u])=>`${new Date(d+'T'+hm).toLocaleDateString([], {weekday:'short'})} ${fmtH(+new Date(d+'T'+hm))}: ${u} unit${u===1?'':'s'}`).join(', ')).join('; ');
+      out.push(`<span><span class="badge hand">Morgan Falls Dam</span>Releasing <b>${c.flow.toLocaleString()} cfs</b> (${c.units} unit${c.units===1?'':'s'}) as of ${fmtT(new Date(c.time))}.${sch?` Georgia Power schedule: ${sch}.`:''}</span>`); }
     out.push(`<span><span class="badge check">Delayed harvest</span>Sope Creek to US 41 (Paces Mill), Nov 1–May 14: ${dh?'<b>in season now</b>. Catch and release only, artificial lures with a single hook.':'out of season; general trout rules apply.'} Check GA DNR rules before fishing.</span>`);
   }
   return out.join('');

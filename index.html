@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hooch Watch">
+<meta name="theme-color" content="#0f2a2e">
+<title>Chattahoochee River Watch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: single tall column, phone-first. Summary verdict up top, then release timeline, then gauges, then season notes. */
+:root{
+  --bg:#f3f6f4; --panel:#ffffff; --ink:#122523; --muted:#5a6d69; --line:#d6e0dc;
+  --river:#1f6f78; --river-soft:#d4ebec; --dam:#7b2cbf; --turb:#e8590c; --ecoli:#0b7a3e;
+  --good:#2e7d4f; --warn:#b7791f; --bad:#b83a32;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:Inter,system-ui,-apple-system,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1716; --panel:#13221f; --ink:#e3eeeb; --muted:#91a6a1; --line:#25403b;
+  --river:#5fc0c9; --river-soft:#173a3d; --dam:#c792ff; --turb:#ff922b; --ecoli:#69db7c;
+  --good:#5cc489; --warn:#e7b04f; --bad:#ef7a70; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1716; --panel:#13221f; --ink:#e3eeeb; --muted:#91a6a1; --line:#25403b;
+  --river:#5fc0c9; --river-soft:#173a3d; --dam:#c792ff; --turb:#ff922b; --ecoli:#69db7c;
+  --good:#5cc489; --warn:#e7b04f; --bad:#ef7a70; color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:calc(env(safe-area-inset-top,0px) + 12px) calc(env(safe-area-inset-bottom,0px) + 32px)}
+main{max-width:680px;margin:0 auto;display:grid;gap:14px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font:700 30px/1 var(--f-display);letter-spacing:.01em;margin:0;text-transform:uppercase}
+h1 small{display:block;font:500 13px/1.3 var(--f-body);letter-spacing:0;text-transform:none;color:var(--muted);margin-top:4px}
+h2{font:700 18px/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;color:var(--muted)}
+button{font:600 13px var(--f-body);color:var(--river);background:transparent;border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--river);outline-offset:2px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.verdict{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.score{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;border:6px solid var(--line);font:700 34px/1 var(--f-display)}
+.score span{display:block;font:500 11px var(--f-body);color:var(--muted);text-align:center;letter-spacing:.05em}
+.verdict h3{margin:0 0 4px;font:700 24px/1.1 var(--f-display);text-transform:uppercase}
+.verdict p{margin:0;color:var(--muted)}
+ul.reasons{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:6px;grid-column:1/-1}
+ul.reasons li{display:flex;gap:8px;align-items:flex-start}
+.dot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:7px;background:var(--muted)}
+.g{background:var(--good)}.w{background:var(--warn)}.b{background:var(--bad)}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(min-width:560px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
+.tile .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.tile .v{font:600 22px/1.2 var(--f-mono);font-variant-numeric:tabular-nums;margin-top:2px}
+.tile .v small{font:500 12px var(--f-body);color:var(--muted)}
+.tile .s{font-size:12px;margin-top:4px;display:flex;gap:6px;align-items:center}
+.tile .s .dot{margin-top:0}
+.timeline{display:grid;gap:0;margin:0;padding:0;list-style:none}
+.timeline li{display:grid;grid-template-columns:76px 1fr;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.timeline li:first-child{border-top:0}
+.timeline time{font:600 14px var(--f-mono);font-variant-numeric:tabular-nums}
+.timeline .past{color:var(--muted)}
+.timeline .now time{color:var(--river)}
+.status{font-weight:600}
+.chartwrap{overflow-x:auto;position:relative}
+#chart{touch-action:pan-y;cursor:crosshair;display:block}
+.readout{position:absolute;top:6px;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.45;box-shadow:0 2px 8px color-mix(in srgb,var(--ink) 15%,transparent);white-space:nowrap;font-variant-numeric:tabular-nums}
+.readout b{font-weight:600}
+.readout .t{font-weight:600;margin-bottom:2px}
+.readout i{display:inline-block;width:9px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+svg text{fill:var(--muted);font:11px var(--f-body)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:6px 8px;border-top:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.season p{margin:0 0 8px}
+.season b{font-weight:600}
+.foot{font-size:12px;color:var(--muted)}
+.foot a{color:var(--river)}
+.err{color:var(--bad);font-weight:600}
+.day{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.day:first-child{border-top:0}
+.day .d{font:700 16px/1.2 var(--f-display);text-transform:uppercase;letter-spacing:.03em}
+.day .d small{display:block;font:400 11px var(--f-body);text-transform:none;letter-spacing:0;color:var(--muted)}
+.wins{display:flex;flex-wrap:wrap;gap:6px}
+.win{font:600 12.5px var(--f-mono);font-variant-numeric:tabular-nums;padding:3px 9px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.win.prime{background:var(--good);border-color:var(--good);color:var(--panel)}
+.win.good{border-color:var(--good);color:var(--good)}
+.win.none{color:var(--muted);font-family:var(--f-body);font-weight:500}
+.meta{font-size:12px;color:var(--muted);margin-top:5px}
+.meta b{font-weight:600;color:var(--ink)}
+.flag{color:var(--warn);font-weight:600}
+.flag.bad{color:var(--bad)}
+.strip{display:grid;grid-template-columns:repeat(48,1fr);height:8px;border-radius:4px;overflow:hidden;margin-top:6px;background:var(--line)}
+.strip i{display:block}
+.strip .s-prime{background:var(--good)}.strip .s-good{background:color-mix(in srgb,var(--good) 45%,var(--panel))}
+.strip .s-high{background:var(--river)}.strip .s-dark{background:var(--line)}.strip .s-meh{background:color-mix(in srgb,var(--muted) 25%,var(--panel))}
+.strip .s-now{box-shadow:inset 2px 0 0 var(--ink)}
+.sched summary{cursor:pointer;font-weight:600;color:var(--river);margin-top:12px}
+.schedform{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:10px}
+.schedform label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+.schedform input{font:15px var(--f-body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.schedlist{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:6px}
+.schedlist li{display:flex;justify-content:space-between;align-items:center;gap:8px;font-family:var(--f-mono);font-size:13px}
+.tripctl{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.tripctl.top{grid-column:1/-1;margin:0 0 4px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.tripctl label{display:grid;gap:3px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.tripctl select:disabled{opacity:.55}
+.tripctl select{font:14px var(--f-body);padding:6px 34px 6px 10px;border:1px solid var(--line);border-radius:8px;color:var(--ink);-webkit-appearance:none;appearance:none;background-color:var(--bg);background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 19px) 52%,calc(100% - 14px) 52%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.tripctl select:focus-visible{outline:2px solid var(--river);outline-offset:1px}
+.strip.rel{height:3px;margin-top:2px;background:transparent}
+.strip.rel .s-high{background:var(--river)}
+#logMore summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 0 2px;border-top:1px solid var(--line);color:var(--river);font-weight:600;font-size:13px}
+#logMore summary::-webkit-details-marker{display:none}
+#logMore .chev{display:inline-block;font-size:18px;line-height:1;transition:transform .2s}
+#logMore[open] .chev{transform:rotate(180deg)}
+#logMore .less{display:none}#logMore[open] .less{display:inline}#logMore[open] .more{display:none}
+#logMore[open] summary{order:2}
+.legend2{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:2px 0 6px}
+.legend2 i{display:inline-block;width:10px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.mono{font-family:var(--f-mono)}
+@media (prefers-reduced-motion:no-preference){.score{transition:border-color .4s}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Chattahoochee River Watch<small id="sub">Chattahoochee River below Buford Dam</small></h1>
+    <button id="refresh" type="button">Refresh</button>
+  </header>
+
+  <section class="panel verdict" aria-live="polite">
+    <div class="tripctl top">
+      <label>Launch from<select id="tLaunch"><option value="dam">Buford Dam (Lower Pool)</option><option value="settles">Settles Bridge</option><option value="mcginnis">McGinnis Ferry</option><option value="abbotts">Abbotts Bridge</option><option value="medlock">Medlock Bridge</option></select></label>
+      <label id="motorLbl">Motor up<select id="tMotor"><option value="0">0 (drift only)</option><option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">1 h</option><option value="90">1.5 h</option></select></label>
+      <label id="floatLbl">Float back<select id="tFloat"><option value="0">—</option><option value="3">3 h</option><option value="3.5">3.5 h</option><option value="4">4 h</option><option value="4.5">4.5 h</option><option value="5">5 h</option></select></label>
+    </div>
+    <div class="score" id="score">--<span>SCORE</span></div>
+    <div><h3 id="verdict">Loading gauges…</h3><p id="verdictSub">Pulling live USGS readings.</p></div>
+    <ul class="reasons" id="reasons"></ul>
+  </section>
+
+  <section class="tiles" id="tiles"></section>
+
+  <section class="panel">
+    <h2>Buford Dam release timeline</h2>
+    <p class="status" id="releaseStatus">–</p>
+    <ol class="timeline" id="timeline"></ol>
+  </section>
+
+  <section class="panel">
+    <h2>Best times to launch</h2>
+    <div id="ahead"></div>
+    <p class="foot" id="schedNote"></p>
+  </section>
+
+
+  <section class="panel">
+    <h2>Last 48 hours</h2>
+    <div class="chartwrap"><svg id="chart" viewBox="0 0 640 230" width="100%" role="img" aria-label="River stage at Medlock and dam outflow, last 48 hours"></svg><div class="readout" id="readout" hidden></div></div>
+    <div class="legend"><span><i style="background:var(--river)"></i>Medlock stage (ft)</span><span><i style="background:var(--dam)"></i>Dam outflow (cfs)</span><span><i style="background:var(--turb)"></i>Turbidity (FNU)</span><span><i style="background:var(--ecoli)"></i>E. coli est. (/100 mL), thin line = 235 limit</span></div>
+  </section>
+
+  <section class="panel season">
+    <h2 id="seasonTitle">Trout this month</h2>
+    <div id="season"></div>
+  </section>
+
+  <section class="panel">
+    <h2 id="playTitle">How a release plays out</h2>
+    <table>
+      <thead><tr><th>When</th><th>What you see at the ramp</th></tr></thead>
+      <tbody id="playBody"></tbody>
+    </table>
+    <p class="foot">Measured from about 45 releases, Sept 17 to Nov 16 2026, at USGS gauges at the dam (02334430), below the dam near GA 20 (02334500), above McGinnis Ferry (02334653), and Medlock (02335000). Settles Bridge, McGinnis Ferry and Abbotts Bridge are interpolated by river distance. Clarity, E. coli and temperature are measured only at Medlock.</p>
+  </section>
+
+  <p class="foot">Data: USGS gauges <a href="https://waterdata.usgs.gov/monitoring-location/02335000/" target="_blank" rel="noopener">02335000 Norcross/Medlock</a>, <a href="https://waterdata.usgs.gov/monitoring-location/02334430/" target="_blank" rel="noopener">02334430 Buford Dam</a>, <a href="https://waterdata.usgs.gov/monitoring-location/02334653/" target="_blank" rel="noopener">02334653 Settles Bridge</a>. E. coli is the USGS BacteriALERT estimate from turbidity, not a lab count. Planned release schedule: call the Corps at <span class="mono">770-945-1466</span> or <span class="mono">855-326-3569</span>. Releases can start without warning. Check GA DNR for current regulations.<br><span id="updated"></span></p>
+  <section class="panel">
+    <h2>Past 30 days</h2>
+    <p class="foot" id="logNote"></p>
+    <div id="log"></div>
+  </section>
+</main>
+
+<script>
+const LAT=33.998, LON=-84.200;
+const SITES={dam:'02334430',settles:'02334653',med:'02335000'};
+const H=3600e3;
+// Timing measured from 41 releases (medians)
+const T={rise:5, peak:8.2, dropAfterOff:7.8, clearAfterOff:12.8, normalAfterOff:15.2, settles:2};
+const RELEASE_ON=2000, RELEASE_OFF=1500;
+
+const $=id=>document.getElementById(id);
+const fmtT=d=>d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+const fmtDT=d=>{const today=new Date();const tom=new Date(Date.now()+86400e3);
+  const day=d.toDateString()===today.toDateString()?'':d.toDateString()===tom.toDateString()?'Tmrw ':d.toLocaleDateString([], {weekday:'short'})+' ';
+  return day+fmtT(d)};
+const relH=d=>{const h=(d-Date.now())/H, a=Math.abs(h), v=a<1?Math.round(a*60)+' min':a.toFixed(1)+' h'; return h>=0?'in '+v:v+' ago'};
+
+async function load(){
+  $('verdict').textContent='Loading gauges…';
+  const base='https://waterservices.usgs.gov/nwis/iv/?format=json&siteStatus=all&period=P31D';
+  const urls=[`${base}&sites=${SITES.dam}&parameterCd=00060`,`${base}&sites=${SITES.med}&parameterCd=00060,00065,63680,99407,00010,00045`];
+  let jsons;
+  try{ jsons=await Promise.all(urls.map(async u=>{const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json()})); }
+  catch(e){ $('verdict').innerHTML='<span class="err">Can’t reach USGS</span>'; $('verdictSub').textContent='waterservices.usgs.gov did not answer ('+e.message+'). Check your connection and tap Refresh.'; return; }
+  const S={};
+  for(const ts of jsons.flatMap(j=>j.value.timeSeries)){
+    const site=ts.sourceInfo.siteCode[0].value, p=ts.variable.variableCode[0].value;
+    const blk=ts.values.find(b=>b.value.length); if(!blk) continue;
+    S[site+':'+p]=blk.value.filter(v=>v.value!=='-999999').map(v=>({t:new Date(v.dateTime),v:+v.value}));
+  }
+  render(S);
+}
+
+function last(a){return a&&a.length?a[a.length-1]:null}
+function pct(arr,p){const s=[...arr].sort((a,b)=>a-b);return s[Math.floor((s.length-1)*p)]}
+
+function analyzeRelease(dam){
+  // Walk dam outflow to find most recent on/off transitions
+  let on=null, off=null, inRel=false, events=[];
+  for(const {t,v} of dam){
+    if(!inRel && v>RELEASE_ON){inRel=true;on=t;off=null}
+    else if(inRel && v<RELEASE_OFF){inRel=false;off=t;events.push({on,off})}
+  }
+  if(inRel) events.push({on,off:null});
+  return events;
+}
+
+function sun(date){
+  // NOAA simplified sunrise/sunset
+  const rad=Math.PI/180, d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate(),12));
+  const n=Math.floor((d-Date.UTC(2000,0,1,12))/86400e3)+0.0008;
+  const J=n-LON/360, M=(357.5291+0.98560028*J)%360;
+  const C=1.9148*Math.sin(M*rad)+0.02*Math.sin(2*M*rad)+0.0003*Math.sin(3*M*rad);
+  const L=(M+C+180+102.9372)%360;
+  const Jt=2451545+J+0.0053*Math.sin(M*rad)-0.0069*Math.sin(2*L*rad);
+  const dec=Math.asin(Math.sin(L*rad)*Math.sin(23.44*rad));
+  const w=Math.acos((Math.sin(-0.833*rad)-Math.sin(LAT*rad)*Math.sin(dec))/(Math.cos(LAT*rad)*Math.cos(dec)))/rad;
+  const toDate=j=>new Date((j-2440587.5)*86400e3);
+  return {rise:toDate(Jt-w/360), set:toDate(Jt+w/360)};
+}
+
+function render(S){
+  const dam=S[SITES.dam+':00060']||[], medStage=S[SITES.med+':00065']||[], medQ=S[SITES.med+':00060']||[];
+  const turb=S[SITES.med+':63680']||[], ecoli=S[SITES.med+':99407']||[];
+  const tempC=S[SITES.med+':00010']||[], rain=S[SITES.med+':00045']||[], settles=S[SITES.settles+':00065']||[];
+  const now=new Date();
+  const st=last(medStage), q=last(medQ), tu=last(turb), ec=last(ecoli), tc=last(tempC), dq=last(dam);
+  const base=medStage.length?pct(medStage.map(x=>x.v),0.1):null;
+  const rain24=rain.filter(x=>x.t>now-24*H).reduce((a,b)=>a+b.v,0);
+  const tempF=tc?tc.v*9/5+32:null;
+
+  // Release phase prediction
+  const ev=analyzeRelease(dam); const e=last(ev);
+  let phase='low', lines=[], status='';
+  const LP=launch(), p=prof(LP.km), atMed=LP.id==='medlock', where=atMed?'Medlock':LP.name;
+  if(e){
+    const on=e.on, off=e.off;
+    const rise=new Date(+on+p.rise*H), peak=new Date(+on+p.peak*H);
+    if(!off){
+      phase = now<rise?'incoming':'rising';
+      status=`Dam is generating now (${Math.round(dq.v).toLocaleString()} cfs since ${fmtT(on)}).`;
+      lines=[[on,'Dam opened'],[rise,`Water starts rising at ${where}`],[peak,`${where} near peak (about +${p.ft.toFixed(1)} ft)`],[null,`Wadeable again about ${p.wade.toFixed(1)} h after the dam shuts off`]];
+    } else {
+      const wade=new Date(+off+p.wade*H), normal=new Date(+off+p.settle*H);
+      if(now<rise) phase='incoming'; else if(now<wade) phase='high'; else if(now<normal) phase='falling'; else phase='low';
+      status = phase==='low' ? `Last release ended ${fmtDT(off)}. ${where} is back to low water.` : `Release ran ${fmtT(on)} to ${fmtT(off)} (${((off-on)/H).toFixed(1)} h).`;
+      lines=[[on,'Dam opened'],[off,'Dam shut off'],[rise,`Water starts rising at ${where}`],[peak,`${where} peak, about +${p.ft.toFixed(1)} ft`],[wade,'Wadeable again'],[normal,'Back to normal low water']];
+    }
+  } else status='No release in the last 48 hours. River at base flow.';
+  $('sub').textContent=`Launching from ${LP.name} · ${(LP.km/1.609).toFixed(1)} river miles below Buford Dam`;
+  $('playTitle').textContent=`How a release plays out at ${where}`;
+  const row=(w,t)=>`<tr><td class="mono">${w}</td><td>${t}</td></tr>`, hh=x=>x<0.1?'right away':'+'+x.toFixed(1)+' h';
+  $('playBody').innerHTML=[
+    row(hh(p.rise),'Water starts rising. Get out of the river if you’re wading.'),
+    row('+'+p.peak.toFixed(1)+' h',`Peak, about ${p.ft.toFixed(1)} ft above low water`),
+    row(p.wade<0.1?'at shut-off':'off +'+p.wade.toFixed(1)+' h','Wadeable again'),
+    row('off +'+p.settle.toFixed(1)+' h','Back to normal low water'),
+    row('',`Times are after the dam opens, or after it shuts off (“off”). The water you motor into upstream rises sooner than this.`)].join('');
+  // Cross-check with actual stage (only measured at Medlock)
+  if(atMed && st && base!=null && phase==='low' && st.v>base+0.8) phase='high';
+  $('releaseStatus').textContent=status;
+  $('timeline').innerHTML=lines.map(([t,txt])=>{
+    if(!t) return `<li><time>–</time><span>${txt}</span></li>`;
+    const cls=t<now?'past':(Math.abs(t-now)<1.5*H?'now':'');
+    return `<li class="${cls}"><time>${fmtT(t)}</time><span>${txt} <span class="foot">${t.toDateString()!==now.toDateString()?t.toLocaleDateString([], {weekday:'short'})+' · ':''}${relH(t)}</span></span></li>`}).join('');
+
+  // Score
+  let score=100, R=[];
+  const add=(cls,txt,pen)=>{R.push([cls,txt]);score-=pen};
+  ({low:()=>add('g','Low, stable water. Best wading and drifting conditions.',0),
+    incoming:()=>{const r=new Date(+e.on+p.rise*H);add('w',`Release on the way. Rise reaches ${where} about ${fmtT(r)}. Fish the hour before it, then get out.`,10)},
+    rising:()=>add('b','Water is rising now. Not safe for wading.',45),
+    high:()=>add('b','High release water. Boat or bank only. Fish slow edges and eddies.',35),
+    falling:()=>add('w','Water falling after a release. Fish often feed as it drops.',5)})[phase]();
+  if(tu){ if(tu.v<5) add('g',`Clear water (${tu.v} FNU). Go light and natural.`,0);
+    else if(tu.v<15) add('w',`Lightly stained (${tu.v} FNU). Use bigger, brighter patterns.`,8);
+    else if(tu.v<40) add('w',`Stained (${tu.v} FNU). Streamers and worms work best.`,20);
+    else add('b',`Muddy (${tu.v} FNU). Poor visibility, likely runoff.`,35); }
+  if(ec){ if(ec.v<235) add('g',`E. coli estimate ${ec.v}/100 mL, under the 235 swimming limit.`,0);
+    else if(ec.v<1000) add('w',`E. coli estimate ${ec.v}/100 mL, over 235. Limit skin contact, wash hands.`,10);
+    else add('b',`E. coli estimate ${ec.v}/100 mL. Avoid contact with the water.`,25); }
+  if(tempF!=null){ if(tempF<45) add('w',`Cold water (${tempF.toFixed(0)}°F). Trout are sluggish; fish slow and deep.`,8);
+    else if(tempF<=65) add('g',`Water ${tempF.toFixed(0)}°F, in the trout comfort range.`,0);
+    else if(tempF<=68) add('w',`Water ${tempF.toFixed(0)}°F, getting warm for trout.`,10);
+    else add('b',`Water ${tempF.toFixed(0)}°F. Too warm for trout; skip catch-and-release.`,30); }
+  const s=sun(now), dawn=Math.abs(now-s.rise)<1.5*H, dusk=Math.abs(now-s.set)<1.5*H;
+  if(dawn||dusk) add('g',`Low light (sunrise ${fmtT(s.rise)}, sunset ${fmtT(s.set)}). Prime feeding time.`,0);
+  else if(now<s.rise-1.5*H||now>s.set+H) add('w',`Dark (sunrise ${fmtT(s.rise)}). Legal fishing hours apply.`,20);
+  else add('w',`Midday. Sunrise ${fmtT(s.rise)}, sunset ${fmtT(s.set)}. Shade and riffles fish best.`,5);
+  if(rain24>0.5) add('w',`${rain24.toFixed(2)} in of rain in 24 h. Expect muddier water.`,5);
+  score=Math.max(0,Math.min(100,score));
+  const phaseTxt={low:`Low water at ${where}.`,incoming:'Release heading downstream.',rising:'Release arriving.',high:'Release water at the ramp.',falling:'Release water dropping out.'}[phase];
+
+  // Tiles
+  const tile=(k,v,u,cls,s)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}<small> ${u}</small></div><div class="s"><i class="dot ${cls}"></i>${s}</div></div>`;
+  $('tiles').innerHTML=[
+    tile('Medlock stage',st?st.v.toFixed(2):'–','ft',phase==='low'?'g':phase==='falling'||phase==='incoming'?'w':'b',q?Math.round(q.v).toLocaleString()+' cfs':''),
+    tile('Turbidity',tu?tu.v:'–','FNU',!tu?'':tu.v<5?'g':tu.v<40?'w':'b',!tu?'':tu.v<5?'Clear':tu.v<15?'Light stain':tu.v<40?'Stained':'Muddy'),
+    tile('E. coli est.',ec?ec.v:'–','/100mL',!ec?'':ec.v<235?'g':ec.v<1000?'w':'b',!ec?'':ec.v<235?'Under 235':'Over 235'),
+    tile('Water temp',tempF!=null?tempF.toFixed(0):'–','°F',tempF==null?'':tempF<=65&&tempF>=45?'g':tempF>68?'b':'w',dq?'Dam '+Math.round(dq.v).toLocaleString()+' cfs':'')
+  ].join('');
+
+  drawChart(medStage,dam,turb,ecoli,now);
+  LAST={S,ev,base,now,condScore:score,R,phaseTxt};
+  renderWindows();
+  renderSeason(now);
+  $('updated').textContent='Updated '+fmtDT(now)+(st?' · latest Medlock reading '+fmtT(st.t):'');
+}
+
+let CHART=null;
+function chartHover(ev){
+  if(!CHART) return;
+  const svg=$('chart'), box=svg.getBoundingClientRect(), {t0,t1,L,w,W,ys}=CHART;
+  const vx=(ev.clientX-box.left)/box.width*W;
+  if(vx<L||vx>L+w){chartLeave();return}
+  const t=t0+(vx-L)/w*(t1-t0);
+  if(t>+CHART.now){chartLeave();return}
+  const near=a=>{const i=bsearch(a,t);if(i<0) return null;const j=Math.min(i+1,a.length-1);return Math.abs(a[j].t-t)<Math.abs(a[i].t-t)?a[j]:a[i]};
+  const st=near(CHART.stage), dq=near(CHART.dam), tu=near(CHART.turb), ec=near(CHART.ecoli);
+  $('hover').style.display=''; $('hLine').setAttribute('x1',vx); $('hLine').setAttribute('x2',vx);
+  if(st){$('hDot').setAttribute('cx',vx);$('hDot').setAttribute('cy',ys(st.v))}
+  const d=new Date(t);
+  const rows=[
+    ['--river','Medlock stage',st?st.v.toFixed(2)+' ft':'–'],
+    ['--dam','Dam outflow',dq?Math.round(dq.v).toLocaleString()+' cfs':'–'],
+    ['--turb','Turbidity',tu?tu.v+' FNU':'–'],
+    ['--ecoli','E. coli est.',ec?ec.v+(ec.v>=235?' ⚠':'')+' /100 mL':'–']];
+  const r=$('readout');
+  r.innerHTML=`<div class="t">${d.toLocaleDateString([], {weekday:'short'})} ${d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</div>`+rows.map(([c,k,v])=>`<div><i style="background:var(${c})"></i>${k} <b>${v}</b></div>`).join('');
+  r.hidden=false;
+  const px=(vx/W)*box.width, rw=r.offsetWidth, wrapW=svg.parentElement.clientWidth;
+  r.style.left=Math.max(4,Math.min(px>wrapW/2?px-rw-12:px+12, wrapW-rw-4))+'px';
+}
+function chartLeave(){ if($('hover')) $('hover').style.display='none'; $('readout').hidden=true; }
+$('chart').addEventListener('pointermove',chartHover);
+$('chart').addEventListener('pointerdown',chartHover);
+$('chart').addEventListener('pointerleave',chartLeave);
+function drawChart(stage,dam,turb,ecoli,now){
+  const W=640,Hh=230,L=36,Rr=46,Tp=12,B=26, w=W-L-Rr, h=Hh-Tp-B;
+  const t0=+now-48*H, t1=+now+12*H;
+  const x=t=>L+(t-t0)/(t1-t0)*w;
+  const sMax=Math.max(6,...stage.map(p=>p.v))+0.5, sMin=0;
+  const dMax=Math.max(10000,...dam.map(p=>p.v));
+  const ys=v=>Tp+h-(v-sMin)/(sMax-sMin)*h, yd=v=>Tp+h-v/dMax*h;
+  const path=(arr,y)=>arr.filter(p=>+p.t>=t0).map((p,i)=>(i?'L':'M')+x(+p.t).toFixed(1)+' '+y(p.v).toFixed(1)).join('');
+  let g='';
+  for(let v=0;v<=sMax;v+=2){g+=`<line x1="${L}" x2="${L+w}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${L-6}" y="${ys(v)+4}" text-anchor="end">${v}</text>`}
+  for(let v=0;v<=dMax;v+=5000){g+=`<text x="${L+w+6}" y="${yd(v)+4}">${v/1000}k</text>`}
+  // day ticks
+  const d=new Date(t0);d.setHours(0,0,0,0);
+  for(let t=+d+86400e3;t<t1;t+=86400e3){g+=`<line x1="${x(t)}" x2="${x(t)}" y1="${Tp}" y2="${Tp+h}" stroke="var(--line)" stroke-dasharray="2 3"/><text x="${x(t)+3}" y="${Hh-8}">${new Date(t).toLocaleDateString([], {weekday:'short'})}</text>`}
+  g+=`<line x1="${x(+now)}" x2="${x(+now)}" y1="${Tp}" y2="${Tp+h}" stroke="var(--river)" stroke-width="1.5"/><text x="${x(+now)-4}" y="${Tp+10}" text-anchor="end" style="fill:var(--river)">now</text>`;
+  const tuMax=Math.max(20,...turb.map(p=>p.v)), yt=v=>Tp+h-v/tuMax*h*0.6;
+  const sp=path(stage,ys), pts=stage.filter(p=>+p.t>=t0);
+  if(sp) g+=`<path d="${sp}L${x(+last(pts).t)} ${Tp+h}L${x(+pts[0].t)} ${Tp+h}Z" fill="var(--river-soft)" opacity=".7"/>`;
+  g+=`<path d="${path(dam,yd)}" fill="none" stroke="var(--dam)" stroke-width="2"/>`;
+  g+=`<path d="${path(turb,yt)}" fill="none" stroke="var(--turb)" stroke-width="2.2" stroke-dasharray="5 3"/>`;
+  // E. coli on its own scale (no axis); thin reference line at the 235 swimming limit
+  const ecIn=ecoli.filter(p=>+p.t>=t0), ecMax=Math.max(500,...ecIn.map(p=>p.v)), ye=v=>Tp+h-v/ecMax*h*0.85;
+  g+=`<line x1="${L}" x2="${L+w}" y1="${ye(235)}" y2="${ye(235)}" stroke="var(--ecoli)" stroke-width="1" opacity=".55"/><text x="${L+4}" y="${ye(235)-4}" style="fill:var(--ecoli)">E. coli 235</text>`;
+  g+=`<path d="${path(ecoli,ye)}" fill="none" stroke="var(--ecoli)" stroke-width="2.2" stroke-dasharray="1.5 3" stroke-linecap="round"/>`;
+  if(ecIn.length){const pk=ecIn.reduce((a,b)=>b.v>a.v?b:a); if(pk.v>=235) g+=`<text x="${x(+pk.t)}" y="${ye(pk.v)-5}" text-anchor="middle" style="fill:var(--ecoli);font-weight:600">${pk.v}</text>`}
+  if(sp){g+=`<path d="${sp}" fill="none" stroke="var(--river)" stroke-width="2.2"/>`;
+    const lp=last(pts); g+=`<circle cx="${x(+lp.t)}" cy="${ys(lp.v)}" r="4" fill="var(--river)"/>`}
+  g+=`<text x="${L}" y="${Tp-2}">ft</text><text x="${L+w+6}" y="${Tp-2}">cfs</text>`;
+  g+=`<g id="hover" style="display:none"><line id="hLine" y1="${Tp}" y2="${Tp+h}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3" opacity=".6"/><circle id="hDot" r="4" fill="var(--river)" stroke="var(--panel)" stroke-width="1.5"/></g>`;
+  $('chart').innerHTML=g;
+  CHART={stage,dam,turb,ecoli,t0,t1,L,w,W,ys,now};
+}
+
+const MONTHS=[
+ ['January','Coldest water of the year, about 45 to 50°F. Trout hold deep and slow. Midges are the main hatch.','Fish midday when the water is warmest. Small nymphs (size 18 to 22) under an indicator, or slow-swung streamers.'],
+ ['February','Still cold. Early Blue-winged Olives on overcast afternoons. Stocking resumes.','Midges and BWO nymphs, egg patterns. Spinners and small spoons work for stocked rainbows.'],
+ ['March','Water warming. Caddis and BWOs pick up. Rainbows spawn. Spring rains bring muddy water.','Caddis pupae, soft hackles, Pheasant Tails. After rain, streamers in the stain.'],
+ ['April','Strong caddis hatches and heavy stocking. One of the best months.','Dry-dropper rigs in the evenings. Inline spinners and small crankbaits for spin anglers.'],
+ ['May','Peak insect activity: caddis, sulphurs, crane flies. Stocking continues.','Evening dry-fly fishing. Fish low water before the afternoon release reaches you.'],
+ ['June','Medlock starts warming on long low-water afternoons. Trout move into cold release water.','Fish early mornings and right as cold release water arrives. Terrestrials along banks.'],
+ ['July','Warmest month at Medlock. Afternoon water can top 68°F. Trout are stressed.','Fish dawn only, or upstream nearer the dam where water stays cold. Land fish quickly.'],
+ ['August','Like July. Thunderstorms spike turbidity and E. coli fast.','Dawn sessions. Check E. coli after storms. Hoppers and beetles along shady banks.'],
+ ['September','Water cools late in the month. Fewer people, terrestrials still work.','Ants, beetles, and small nymphs. Streamers on cloudy days.'],
+ ['October','Brown trout begin spawning. Water is clear and cooling. Fall color, low crowds.','Streamers for aggressive pre-spawn browns. Don’t walk through gravel beds where fish are spawning.'],
+ ['November','Brown trout spawn peaks. Delayed-harvest season opens Nov 1 downstream (Sope Creek to US 41). Clear, cool water.','Egg patterns and streamers. Avoid fishing to fish sitting on redds. Midges on calm afternoons.'],
+ ['December','Water near 50°F and steady from the dam. Midges dominate. Post-spawn browns are hungry.','Small midge nymphs, egg patterns, and slow streamers. Fish midday warmth.']];
+function renderSeason(now){
+  const [m,habit,tactic]=MONTHS[now.getMonth()];
+  $('seasonTitle').textContent='Trout in '+m;
+  $('season').innerHTML=`<p><b>Behavior.</b> ${habit}</p><p><b>What works.</b> ${tactic}</p>
+  <p><b>Rules at Medlock.</b> Medlock Bridge ramp is the downstream end of the artificial-lures-only stretch, which runs from GA 20 to the ramp. Below the ramp, general trout rules apply. You need a Georgia fishing license and a trout license. The river is open all year.</p>`;
+}
+
+// ---------- Fishing windows ----------
+let LAST=null, SCHED=null;
+const SLOT=30*60e3;
+// Release effect at Medlock (measured, 36 clean releases): too high to wade from on+5h until off+12h; settled by off+15h
+const M={caution:4.5, high:5, wadeAfterOff:12, settleAfterOff:15, mwRelease:20};
+async function loadSchedule(){
+  try{const r=await fetch('data/schedule.json',{cache:'no-store'}); if(!r.ok) throw 0; SCHED=await r.json();}
+  catch(e){SCHED=null}
+}
+function schedReleases(){
+  // Contiguous hours at >= 20 MW are a release (minimum flow runs 4-7 MW)
+  const out=[]; if(!SCHED) return out;
+  for(const [day,hrs] of Object.entries(SCHED.days)){
+    const [y,m,d]=day.split('-').map(Number); let cur=null;
+    for(const {hour,mw} of [...hrs].sort((a,b)=>a.hour-b.hour)){
+      const t=new Date(y,m-1,d,hour);
+      if(mw>=M.mwRelease){ if(cur&&+cur.off===+t){cur.off=new Date(+t+H);cur.mw=Math.max(cur.mw,mw)} else {cur={on:t,off:new Date(+t+H),mw,src:'sched'};out.push(cur)} }
+    }
+  }
+  return out;
+}
+const dayKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function bsearch(arr,t){let lo=0,hi=arr.length-1,r=-1;while(lo<=hi){const m=(lo+hi)>>1;if(+arr[m].t<=t){r=m;lo=m+1}else hi=m-1}return r}
+function valAt(arr,t,maxAge=2*H){const i=bsearch(arr,t);if(i<0) return null;return t-arr[i].t<=maxAge?arr[i].v:null}
+
+// ---- Release timing along the river ----
+// Measured medians from ~45 releases (Sept–Nov 2026) at four USGS gauges, by river km below the dam.
+// rise: h after dam opens until water starts rising; peak: h after dam opens; wade: h after dam shuts off until
+// stage is within 0.8 ft of base; settle: h after shut-off until within 0.3 ft; ft: typical rise in feet.
+const PROFILE=[
+  {km:0.7, rise:0,   peak:0.5, wade:0,   settle:0.25, ft:3.6},  // 02334430 at the dam
+  {km:4.7, rise:0.5, peak:2.0, wade:2.8, settle:3.8,  ft:6.0},  // 02334500 near Buford (GA 20 area)
+  {km:13.7,rise:2.0, peak:3.8, wade:6.8, settle:8.0,  ft:4.8},  // 02334653 above McGinnis Ferry
+  {km:29.7,rise:5.0, peak:8.2, wade:11.8,settle:15.0, ft:2.1}]; // 02335000 Medlock
+function prof(km){
+  const P=PROFILE; if(km<=P[0].km) return {...P[0]}; if(km>=P[P.length-1].km) return {...P[P.length-1]};
+  const i=P.findIndex(p=>p.km>=km), a=P[i-1], b=P[i], f=(km-a.km)/(b.km-a.km), o={km};
+  for(const k of ['rise','peak','wade','settle','ft']) o[k]=a[k]+(b[k]-a[k])*f;
+  return o;
+}
+const LAUNCHES=[
+  {id:'dam',name:'Buford Dam (Lower Pool)',km:0.7},
+  {id:'settles',name:'Settles Bridge',km:10.3},
+  {id:'mcginnis',name:'McGinnis Ferry',km:15.6},
+  {id:'abbotts',name:'Abbotts Bridge',km:22.4},
+  {id:'medlock',name:'Medlock Bridge',km:29.7},
+  {id:'jones',name:'Jones Bridge',km:34.5,takeoutOnly:true}];
+// Drift-only trips (no motor) end at the next ramp downstream
+const nextRamp=L=>LAUNCHES[LAUNCHES.indexOf(L)+1];
+// Drift speed with fishing stops, km/h: about 1.3 mph at low water, faster as release water arrives
+const DRIFT_KMH={low:2.1,falling:2.8,caution:3.5,high:4.8};
+const MED_KM=29.7, MOTOR_KMH=13; // net upstream speed at low water, about 8 mph
+const launch=()=>LAUNCHES.find(l=>l.id===TRIP.launch)||LAUNCHES[4];
+
+function stateAt(km,t,ctx){
+  // Water at river km `km` at time t: {water, turb, ec, tf}
+  const {S,base,now,rel}=ctx, p=prof(km); let water='low';
+  const st=S[SITES.med+':00065']||[];
+  if(km>=MED_KM-0.5 && t<=+now){
+    const v=valAt(st,t); if(v==null) return null;
+    water = v<=base+0.5?'low': v<=base+0.8?'falling':'high';
+  } else {
+    for(const r of rel){
+      const on=+r.on, off=+(r.off||new Date(on+2.5*H));
+      if(t>=on+(p.rise+0.5)*H && t<off+Math.max(p.wade,0.25)*H){water='high';break}
+      if(t>=on+p.rise*H && t<on+(p.rise+0.5)*H) water='caution';
+      else if(water==='low' && t>=off+p.wade*H && t<off+p.settle*H) water='falling';
+    }
+  }
+  // Clarity, E. coli and temperature are only measured at Medlock. Upstream, the same water reaches
+  // Medlock later, so read Medlock at t + (Medlock lag - local lag).
+  const tq=Math.min(+now, t+(PROFILE[3].rise-p.rise)*H);
+  const pick=k=>{const a=S[SITES.med+':'+k]||[];return tq<+now?valAt(a,tq):(a.length?a[a.length-1].v:null)};
+  const tc=pick('00010');
+  let turb=pick('63680'), ec=pick('99407');
+  // Forecast hours: release water scours the bed. Measured at Medlock, turbidity rises from about 3 to 9-15 FNU
+  // and the E. coli estimate (derived from turbidity) rises about 60%. Past hours use what was actually measured.
+  if(tq>=+now && t>+now && water!=='low'){
+    const hi=water==='high';
+    if(turb!=null) turb=Math.round((turb+(hi?8:4))*10)/10;
+    if(ec!=null) ec=Math.round(ec*(hi?1.6:1.3));
+  }
+  return {water,turb,ec,tf:tc==null?null:tc*9/5+32};
+}
+// Backward-compatible wrapper: conditions at the selected launch point
+function slotState(t,ctx){return stateAt(launch().km,t,ctx)}
+
+// ---- Trip model ----
+const TRIP_DEFAULT={motor:45,float:4,launch:'medlock'};
+let TRIP={...TRIP_DEFAULT};
+try{const s=JSON.parse(localStorage.getItem('medlockTrip')||'{}'); delete s.lead; Object.assign(TRIP,s)}catch(e){}
+// From any ramp but the dam: motor upstream, turn around, float back to the ramp.
+// From the dam you can't go upstream, so float down first, then motor back up.
+function tripPath(T){
+  const L=launch(), mot=TRIP.motor*60e3, fl=TRIP.float*H;
+  const reach=TRIP.motor/60*MOTOR_KMH;
+  if(L.id==='dam'){
+    const far=Math.min(L.km+reach, MED_KM);
+    return {floatFirst:true, fStart:T, fEnd:T+fl, mStart:T+fl, end:T+fl+mot,
+      floatKm:f=>L.km+(far-L.km)*f, motorKm:f=>far-(far-L.km)*f, turn:far};
+  }
+  const turn=Math.max(LAUNCHES[0].km, L.km-reach);
+  return {floatFirst:false, mStart:T, fStart:T+mot, fEnd:T+mot+fl, end:T+mot+fl,
+    motorKm:f=>L.km-(L.km-turn)*f, floatKm:f=>turn+(L.km-turn)*f, turn};
+}
+function fishQ(t,km,ctx,sunT){
+  if(t<+sunT.rise-30*60e3||t>+sunT.set+30*60e3) return {q:0,dark:true};
+  const s=stateAt(km,t,ctx); if(!s) return null;
+  let q = s.water==='low'?60 : s.water==='falling'?55 : s.water==='caution'?40 : 15;
+  if(s.turb!=null) q+= s.turb<5?15: s.turb<15?5: s.turb<40?-15:-40;
+  if(s.tf!=null) q+= s.tf>68?-40: s.tf>65?-10: s.tf<45?-10:5;
+  if(s.ec!=null && s.ec>=235) q-=10;
+  if((t>=+sunT.rise-30*60e3&&t<=+sunT.rise+2*H)||(t>=+sunT.set-2*H&&t<=+sunT.set+30*60e3)) q+=20;
+  return {q:Math.max(0,Math.min(100,q)),s};
+}
+function driftScore(T,ctx,sunT){
+  const L=launch(), to=nextRamp(L), step=15*60e3;
+  let km=L.km, t=T, sum=0, n=0, prev=null;
+  const flags={releaseHit:null,afterDark:false,muddy:false,drift:true,to:to.name};
+  while(km<to.km && t<T+14*H){
+    const r=fishQ(t,km,ctx,sunT);
+    if(r){
+      if(r.dark) flags.afterDark=true;
+      if(r.s){ const hi=r.s.water==='high'||r.s.water==='caution'; if(hi) flags.hiN=(flags.hiN||0)+1;
+        if(hi && prev===false && !flags.releaseHit) flags.releaseHit={t,into:(t-T)/H};
+        prev=hi; if(r.s.turb!=null&&r.s.turb>=15) flags.muddy=true; }
+      sum+=r.q;n++;
+    }
+    km+=(DRIFT_KMH[r&&r.s?r.s.water:'low'])*step/H; t+=step;
+  }
+  if(!n) return {score:null};
+  flags.hours=(t-T)/H; flags.hiShare=(flags.hiN||0)/n;
+  return {score:Math.max(0,Math.round(sum/n-(flags.releaseHit?10:0))),flags,fEnd:t};
+}
+function tripScore(T,ctx,sunT){
+  if(T<+sunT.rise-30*60e3||T>+sunT.set+30*60e3) return {score:null,dark:true};
+  if(TRIP.motor===0) return driftScore(T,ctx,sunT);
+  const P=tripPath(T), mot=TRIP.motor*60e3, fl=TRIP.float*H, step=15*60e3;
+  let pen=0, flags={motorHigh:false,motorRising:false,releaseHit:null,afterDark:false,muddy:false,upstream:!P.floatFirst};
+  for(let t=P.mStart;t<P.mStart+mot;t+=step){
+    const s=stateAt(P.motorKm((t-P.mStart)/mot),t,ctx); if(!s) continue;
+    if(s.water==='high') flags.motorHigh=true; else if(s.water==='caution') flags.motorRising=true;
+  }
+  // Motoring upstream against release water is the hard case; motoring back to the dam in it is slower too
+  if(flags.motorHigh) pen+=P.floatFirst?10:15; else if(flags.motorRising) pen+=8;
+  let sum=0,n=0,prev=null;
+  for(let t=P.fStart;t<P.fEnd;t+=step){
+    const r=fishQ(t,P.floatKm((t-P.fStart)/fl),ctx,sunT); if(!r) continue;
+    if(r.dark) flags.afterDark=true;
+    if(r.s){ const hi=r.s.water==='high'||r.s.water==='caution'; if(hi) flags.hiN=(flags.hiN||0)+1;
+      if(hi && prev===false && !flags.releaseHit) flags.releaseHit={t,into:(t-P.fStart)/H};
+      prev=hi; if(r.s.turb!=null&&r.s.turb>=15) flags.muddy=true; }
+    sum+=r.q;n++;
+  }
+  if(P.end>+sunT.set+30*60e3) flags.afterDark=true;
+  if(!n) return {score:null};
+  flags.hiShare=(flags.hiN||0)/n;
+  if(flags.releaseHit) pen+=10;
+  return {score:Math.max(0,Math.round(sum/n-pen)),flags,fEnd:P.end};
+}
+const heat=sc=>sc==null?'var(--line)':sc>=50?`color-mix(in srgb,var(--good) ${Math.round((sc-50)/50*100)}%,var(--warn))`:`color-mix(in srgb,var(--warn) ${Math.round(sc/50*100)}%,var(--bad))`;
+function dayWindows(day,ctx){
+  const d0=new Date(day.getFullYear(),day.getMonth(),day.getDate()); const sunT=sun(d0);
+  const slots=[];
+  for(let i=0;i<48;i++){
+    const t=+d0+i*SLOT, tr=tripScore(t,ctx,sunT);
+    const atRamp=slotState(t+SLOT/2,ctx);
+    slots.push({t,score:tr.score,dark:!!tr.dark,flags:tr.flags,fEnd:tr.fEnd,release:atRamp&&(atRamp.water==='high'||atRamp.water==='caution')});
+  }
+  const wins=[];let cur=null;
+  for(const s of slots){
+    const cls=s.score==null?null:s.score>=85?'prime':s.score>=65?'good':null;
+    if(cls){ if(cur&&cur.cls===cls){cur.end=s.t+SLOT;cur.best=Math.max(cur.best,s.score)} else {cur={cls,start:s.t,end:s.t+SLOT,best:s.score};wins.push(cur)} }
+    else cur=null;
+  }
+  return {slots,wins,sunT};
+}
+const fmtH=t=>new Date(t).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}).replace(':00','').replace(' ','').toLowerCase();
+function winHTML(w){return `<span class="win ${w.cls}">${w.cls==='prime'?'★ ':''}Launch ${fmtH(w.start)}–${fmtH(w.end)}</span>`}
+function stripHTML(slots,now){
+  return `<div class="strip" aria-hidden="true">${slots.map(s=>`<i style="background:${s.dark?'var(--line)':heat(s.score)}" class="${now>=s.t&&now<s.t+SLOT?'s-now':''}" title="${fmtH(s.t)} launch: ${s.score??'–'}"></i>`).join('')}</div>
+  <div class="strip rel" aria-hidden="true">${slots.map(s=>`<i class="${s.release?'s-high':''}"></i>`).join('')}</div>`;
+}
+function tripNotes(tr){
+  const f=tr.flags||{}, out=[];
+  if(f.motorHigh) out.push(['b',f.upstream?'Motoring up against release flow, about 4,000+ cfs. Slower run and more fuel.':'Motoring back up to the dam against release flow. Slower run and more fuel.']);
+  else if(f.motorRising) out.push(['w','Release water is building as you motor up.']);
+  if(f.releaseHit) out.push(['w',`Release water reaches you about ${fmtT(new Date(f.releaseHit.t))}, ${f.releaseHit.into.toFixed(1)} h into the ${f.drift?'drift':'float'}. Expect rising, stained water${f.drift?' and a faster drift':''}.`]);
+  if(!f.releaseHit && f.hiShare>=0.25) out.push(['b',`You’d be on release water for ${Math.round(f.hiShare*100)}% of the ${f.drift?'drift':'float'}: high, fast and stained. Tough fishing.`]);
+  if(f.afterDark) out.push(['w','The float runs past legal fishing hours. Launch earlier or shorten it.']);
+  if(f.muddy&&!f.releaseHit) out.push(['w','Stained water for part of the float.']);
+  return out;
+}
+
+function renderVerdict(ctx){
+  const {now,condScore,R,phaseTxt}=LAST; const sunT=sun(now);
+  const tr=tripScore(+now,ctx,sunT);
+  const score=tr.score==null?condScore:Math.round(0.35*condScore+0.65*tr.score);
+  const col=score>=75?'var(--good)':score>=50?'var(--warn)':'var(--bad)';
+  $('score').style.borderColor=col; $('score').innerHTML=score+'<span>SCORE</span>';
+  $('verdict').textContent=tr.score==null?(score>=75?'Good to fish':score>=50?'Fishable':'Poor right now'):(score>=75?'Good time to launch':score>=50?'Fishable trip':'Poor time to launch');
+  const back=!tr.fEnd?'':tr.flags&&tr.flags.drift?` Drift now and you reach ${tr.flags.to} about ${fmtT(new Date(tr.fEnd))} (${tr.flags.hours.toFixed(1)} h).`:` Launch now and you’re back about ${fmtT(new Date(tr.fEnd))}.`;
+  $('verdictSub').textContent=phaseTxt+back;
+  const notes=tr.score==null?[]:tripNotes(tr);
+  if(tr.score!=null&&!notes.length&&tr.flags.drift) notes.push(['g',`Clean drift to ${tr.flags.to}. No release water reaches you.`]);
+  if(tr.score!=null&&!notes.length) notes.push(['g',launch().id==='dam'?`Clean ${TRIP.float} h float and an easy run back to the dam. No release water reaches you.`:`Clear run up and a clean ${TRIP.float} h float. No release water reaches you.`]);
+  $('reasons').innerHTML=[...notes,...R].map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
+}
+
+function buildCtx(){
+  const {S,ev,base,now}=LAST;
+  const sched=schedReleases();
+  const rel=[...ev.map(e=>({...e,src:'gauge'})), ...sched.filter(s=>!ev.some(e=>Math.abs(e.on-s.on)<2*H))];
+  return {S,base,now,rel,sched,ev};
+}
+function dayRow(d,ctx,{isToday,future,meta}){
+  const {slots,wins}=dayWindows(d,ctx);
+  const shown=isToday?wins.filter(w=>w.end>+ctx.now):wins;
+  const best=slots.filter(s=>s.score!=null&&(!isToday||s.t+SLOT>+ctx.now)).sort((a,b)=>b.score-a.score)[0];
+  const bestTxt=best&&best.score>=50?`<span class="win none">So-so: launch ${fmtH(best.t)} (score ${best.score})</span>`:`<span class="win none">No good launch ${isToday?'left today':'this day'}</span>`;
+  return `<div class="day"><div class="d">${isToday?'Today':d.toLocaleDateString([], {weekday:'short'})}<small>${d.toLocaleDateString([], {month:'short',day:'numeric'})}</small></div><div>
+    <div class="wins">${shown.map(winHTML).join('')||bestTxt}</div>
+    ${stripHTML(slots,isToday?+ctx.now:-1)}
+    <div class="meta">${meta}</div></div></div>`;
+}
+
+function renderWindows(){
+  if(!LAST) return;
+  const ctx=buildCtx(), {S,now,sched,ev}=ctx;
+  renderVerdict(ctx);
+  const lastSched=sched.length?sched[sched.length-1].on:null;
+  const days=[new Date(now)];
+  if(lastSched){for(let d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);d<=lastSched;d.setDate(d.getDate()+1)) days.push(new Date(d))}
+  const relTxt=list=>list.length?list.map(r=>`${fmtH(+r.on)}–${r.off?fmtH(+r.off):'now'}${r.mw?' ('+Math.round(r.mw)+' MW)':''}`).join(', '):'none';
+  let html=`<div class="legend2"><span><i style="background:var(--good)"></i>Great launch</span><span><i style="background:var(--warn)"></i>Closing / so-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water at your ramp</span></div>`;
+  for(const d of days){
+    const schedDay=sched.filter(r=>dayKey(r.on)===dayKey(d));
+    html+=dayRow(d,ctx,{isToday:dayKey(d)===dayKey(now),meta:`Dam schedule: <b>${SCHED&&SCHED.days[dayKey(d)]?relTxt(schedDay):'not posted'}</b>`});
+  }
+  const tom=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+  if(!SCHED||!SCHED.days[dayKey(tom)]) html+=`<div class="day"><div class="d">${tom.toLocaleDateString([], {weekday:'short'})}<small>${tom.toLocaleDateString([], {month:'short',day:'numeric'})}</small></div><div class="meta">The Corps hasn’t posted this schedule yet. Releases ran every day of the last 60, most starting 4–7 PM.</div></div>`;
+  $('ahead').innerHTML=html;
+  $('schedNote').innerHTML=(SCHED?`Corps schedule checked ${new Date(SCHED.updated).toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})}. `:'<span class="err">Couldn’t load the Corps schedule file.</span> Using live dam readings only; check the recording at (770) 945-1466. ')+
+    `Each bar block is a launch time from ${launch().name} scored for your whole trip: ${TRIP.motor===0?`drift down to ${nextRamp(launch()).name}, no motor (about ${((nextRamp(launch()).km-launch().km)/1.609).toFixed(1)} mi; drift time depends on the flow you get)`:launch().id==='dam'?`${TRIP.float} h float down, ${TRIP.motor} min motor back`:`${TRIP.motor} min up (about ${(TRIP.motor/60*MOTOR_KMH/1.609).toFixed(0)} mi at 8 mph), ${TRIP.float} h float back`}. Future hours assume today’s clarity, E. coli, and temperature hold. The Corps can change releases without notice.`;
+
+  // Log: newest first; 3 days shown, rest behind the toggle
+  const rows=[];
+  for(let i=1;i<=30;i++){
+    const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-i), k=dayKey(d), t0=+d, t1=t0+86400e3;
+    const inDay=a=>(S[SITES.med+':'+a]||[]).filter(p=>+p.t>=t0&&+p.t<t1).map(p=>p.v);
+    const tu=inDay('63680'), ec=inDay('99407'), rain=inDay('00045').reduce((a,b)=>a+b,0);
+    if(!tu.length&&!inDay('00065').length) continue;
+    const ecMax=ec.length?Math.max(...ec):null;
+    rows.push(dayRow(d,ctx,{isToday:false,meta:`Dam: <b>${relTxt(ev.filter(e=>dayKey(e.on)===k))}</b> · Turbidity max <b>${tu.length?Math.max(...tu):'–'}</b> FNU · E. coli max <b class="${ecMax>=235?'flag bad':''}">${ecMax??'–'}</b>${rain>0.1?` · Rain <b>${rain.toFixed(2)}"</b>`:''}`}));
+  }
+  const open=$('logMore')&&$('logMore').open;
+  $('log').innerHTML=rows.slice(0,3).join('')+(rows.length>3?`<details id="logMore"${open?' open':''}><summary><span class="chev" aria-hidden="true">▾</span> <span class="more">Show ${rows.length-3} more days</span><span class="less">Show fewer</span></summary>${rows.slice(3).join('')}</details>`:'');
+  $('logNote').textContent='Launch scores from what the Medlock gauge actually recorded. Dam times are when outflow at the dam passed 2,000 cfs.';
+}
+
+function tripControls(){
+  const sync=()=>{ const drift=TRIP.motor===0; $('tFloat').disabled=drift;
+    $('floatLbl').firstChild.textContent=drift?`Drift to ${nextRamp(launch()).name}`:'Float back'; };
+  $('tMotor').value=TRIP.motor; $('tFloat').value=TRIP.float; $('tLaunch').value=TRIP.launch; sync();
+  for(const id of ['tMotor','tFloat','tLaunch']) $(id).addEventListener('change',ev=>{
+    let motor=+$('tMotor').value, float=+$('tFloat').value;
+    // Changing ramps resets the motor time: Medlock defaults to motoring up, the others to a drift. Still adjustable after.
+    if(ev.target.id==='tLaunch'){ motor=$('tLaunch').value==='medlock'?45:0; $('tMotor').value=motor; }
+    // No motor means a one-way drift: float-back time doesn't apply. Restore a float time when a motor comes back.
+    if(motor===0) float=0; else if(float===0) float=4;
+    $('tFloat').value=float;
+    TRIP={motor,float,launch:$('tLaunch').value}; sync();
+    try{localStorage.setItem('medlockTrip',JSON.stringify(TRIP))}catch(e){}
+    if(LAST) render(LAST.S); else renderWindows();
+  });
+}
+tripControls();
+$('refresh').addEventListener('click',()=>{loadSchedule().then(renderWindows);load()});
+loadSchedule().then(renderWindows);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden) load()});
+setInterval(load,10*60e3);
+load();
+</script>
+</body>
+</html>

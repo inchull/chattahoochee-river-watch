@@ -139,6 +139,8 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 .rampinfo{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted);display:grid;gap:4px}
 .rampinfo:empty{display:none}
 .badge{display:inline-block;font:600 11px var(--f-body);letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;margin-right:6px;vertical-align:1px}
+.badge.trailer,.badge.wade-common{color:var(--good)}.badge.wade-limited{color:var(--warn)}.badge.wade-not{color:var(--bad)}.badge.wade-none{color:var(--muted)}
+.rampinfo a{color:var(--river);font-weight:600}
 .badge.trailer{color:var(--good)}.badge.hand{color:var(--river)}.badge.check{color:var(--warn)}
 .rampinfo .warn{color:var(--bad);font-weight:600}
 .tripctl.top #launchLbl{flex-basis:100%}
@@ -726,23 +728,23 @@ function prof(km){
 // ramp: 'trailer' = boat ramp for trailered boats; 'hand' = canoe/kayak, carry in; 'check' = status unconfirmed.
 // pool: Morgan Falls Dam splits the river; you can't drift or motor between 'upper' and 'lower'.
 const LAUNCHES=[
-  {id:'dam',name:'Buford Dam (Lower Pool)',km:0.7,ramp:'trailer',pool:'upper',note:'Corps park ramp below the dam. PFD required from the dam to GA 20.'},
-  {id:'bowmans',name:'Bowmans Island',km:4.4,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.'},
-  {id:'settles',name:'Settles Bridge',km:10.3,ramp:'hand',pool:'upper',note:'Hand-launch only: carry about 0.1 mi from the lot. No trailers.'},
-  {id:'mcginnis',name:'McGinnis Ferry',km:16.6,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.'},
-  {id:'rogers',name:'Rogers Bridge',km:19.8,ramp:'hand',pool:'upper',note:'Hand-launch only, no motors. NPS lists it as temporarily closed; check before going.'},
-  {id:'abbotts',name:'Abbotts Bridge',km:22.4,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.'},
-  {id:'medlock',name:'Medlock Bridge',km:29.7,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes. Lower end of the artificial-lures-only stretch.'},
-  {id:'jones',name:'Jones Bridge',km:34.8,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.'},
-  {id:'garrard',name:'Garrard Landing (Holcomb Br.)',km:38.5,ramp:'hand',pool:'upper',note:'Across from the Holcomb Bridge unit. Canoe only; the driveway is closed to vehicles, so carry in.'},
-  {id:'islandford',name:'Island Ford',km:47.9,ramp:'hand',pool:'upper',note:'Park HQ. Canoe-only launch.'},
-  {id:'azalea',name:'Azalea Park (Roswell)',km:52.4,ramp:'check',pool:'upper',note:'City of Roswell park with river access; launch type not confirmed.'},
-  {id:'overlook',name:'Overlook Park (Morgan Falls)',km:58.3,ramp:'check',pool:'upper',note:'On Bull Sluice Lake above Morgan Falls Dam; slow lake water. Launch type not confirmed.'},
-  {id:'mfpark',name:'Morgan Falls Park (below dam)',km:59.4,ramp:'check',pool:'lower',note:'First access below Morgan Falls Dam. Georgia Power releases: 404-329-1455. Launch type not confirmed.'},
-  {id:'johnsonferry',name:'Johnson Ferry North',km:62.9,ramp:'trailer',pool:'lower',note:'NPS ramp for boats and canoes. Delayed-harvest water starts at Sope Creek, about 2 mi down.'},
-  {id:'powers',name:'Powers Island (Cochran Shoals)',km:69.2,ramp:'hand',pool:'lower',note:'Canoe-only launch, in the delayed-harvest section.'},
-  {id:'palisades',name:'Palisades (Whitewater Cr. / Akers Mill)',km:71.5,ramp:'hand',pool:'lower',note:'Canoe-only launches on both banks, in the delayed-harvest section.'},
-  {id:'pacesmill',name:'Paces Mill (US 41)',km:73.4,ramp:'trailer',pool:'lower',note:'NPS ramp for boats and canoes. Lower end of the delayed-harvest section.'}];
+  {id:'dam',name:'Buford Dam (Lower Pool)',km:0.7,ramp:'trailer',pool:'upper',note:'Corps park ramp below the dam. PFD required from the dam to GA 20.',wade:'common',wadeNote:'Good wading on both sides. Life jacket required from the dam to GA 20.'},
+  {id:'bowmans',name:'Bowmans Island',km:4.4,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.',wade:'common',wadeNote:'Named as a comfortable wading spot.'},
+  {id:'settles',name:'Settles Bridge',km:10.3,ramp:'hand',pool:'upper',note:'Hand-launch only: carry about 0.1 mi from the lot. No trailers.',wade:'common',wadeNote:'Great wading; the GA 20 to Settles stretch is often called the best wading on the tailwater.'},
+  {id:'mcginnis',name:'McGinnis Ferry',km:16.6,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.',wade:'not',wadeNote:'County fencing blocks wading access upstream of the ramp.'},
+  {id:'rogers',name:'Rogers Bridge',km:19.8,ramp:'hand',pool:'upper',note:'Hand-launch only, no motors. NPS lists it as temporarily closed; check before going.',wade:null,wadeNote:'No wading information found.'},
+  {id:'abbotts',name:'Abbotts Bridge',km:22.4,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.',wade:'limited',wadeNote:'Limited wading.'},
+  {id:'medlock',name:'Medlock Bridge',km:29.7,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes. Lower end of the artificial-lures-only stretch.',wade:'not',wadeNote:'Wooded ramp; not described as a wading spot.'},
+  {id:'jones',name:'Jones Bridge',km:34.8,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.',wade:'common',wadeNote:'Extensive wading over shallow shoals.'},
+  {id:'garrard',name:'Garrard Landing (Holcomb Br.)',km:38.5,ramp:'hand',pool:'upper',note:'Across from the Holcomb Bridge unit. Canoe only; the driveway is closed to vehicles, so carry in.',wade:null,wadeNote:'No wading information found.'},
+  {id:'islandford',name:'Island Ford',km:47.9,ramp:'hand',pool:'upper',note:'Park HQ. Canoe-only launch.',wade:'common',wadeNote:'Extensive wading over shoals.'},
+  {id:'azalea',name:'Azalea Park (Roswell)',km:52.4,ramp:'check',pool:'upper',note:'City of Roswell park with river access; launch type not confirmed.',wade:'limited',wadeNote:'Some wading near GA 9 / Azalea Dr.'},
+  {id:'overlook',name:'Overlook Park (Morgan Falls)',km:58.3,ramp:'check',pool:'upper',note:'On Bull Sluice Lake above Morgan Falls Dam; slow lake water. Launch type not confirmed.',wade:'not',wadeNote:'Lake water above Morgan Falls Dam: slow and deep.'},
+  {id:'mfpark',name:'Morgan Falls Park (below dam)',km:59.4,ramp:'check',pool:'lower',note:'First access below Morgan Falls Dam. Georgia Power releases: 404-329-1455. Launch type not confirmed.',wade:'common',wadeNote:'Good wading below the dam.'},
+  {id:'johnsonferry',name:'Johnson Ferry North',km:62.9,ramp:'trailer',pool:'lower',note:'NPS ramp for boats and canoes. Delayed-harvest water starts at Sope Creek, about 2 mi down.',wade:'not',wadeNote:'Listed as no wading.'},
+  {id:'powers',name:'Powers Island (Cochran Shoals)',km:69.2,ramp:'hand',pool:'lower',note:'Canoe-only launch, in the delayed-harvest section.',wade:'limited',wadeNote:'Main delayed-harvest access, named for its shoals; no detailed wading info found.'},
+  {id:'palisades',name:'Palisades (Whitewater Cr. / Akers Mill)',km:71.5,ramp:'hand',pool:'lower',note:'Canoe-only launches on both banks, in the delayed-harvest section.',wade:'common',wadeNote:'Extensive wading in the delayed-harvest section.'},
+  {id:'pacesmill',name:'Paces Mill (US 41)',km:73.4,ramp:'trailer',pool:'lower',note:'NPS ramp for boats and canoes. Lower end of the delayed-harvest section.',wade:'common',wadeNote:'Extensive wading in the delayed-harvest section. Check park status in season.'}];
 const SHORT={dam:'Buford Dam',bowmans:'Bowmans Is.',settles:'Settles Br.',mcginnis:'McGinnis Fy.',rogers:'Rogers Br.',abbotts:'Abbotts Br.',medlock:'Medlock Br.',jones:'Jones Br.',garrard:'Garrard Ldg.',islandford:'Island Ford',azalea:'Azalea Park',overlook:'Overlook Pk.',mfpark:'Morgan Falls Pk.',johnsonferry:'Johnson Ferry',powers:'Powers Is.',palisades:'Palisades',pacesmill:'Paces Mill'};
 // Delayed harvest: Sope Creek to US 41, Nov 1 - May 14
 const DH={from:66.4,to:73.4};
@@ -850,7 +852,9 @@ function wadeScore(T,ctx,sunT){
     sum+=q;n++;
   }
   if(!n) return {score:null};
-  return {score:Math.round(sum/n),flags,fEnd:T+dur};
+  // Steer toward water people actually wade: not known for wading -20, limited -8
+  const pen=L.wade==='not'?20:L.wade==='limited'?8:0; flags.wadeRating=L.wade;
+  return {score:Math.max(0,Math.round(sum/n)-pen),flags,fEnd:T+dur};
 }
 function driftScore(T,ctx,sunT){
   const L=launch(), to=takeout(L), step=15*60e3;
@@ -927,6 +931,7 @@ function stripHTML(slots,now){
 function tripNotes(tr){
   const f=tr.flags||{}, out=[];
   if(f.wade){
+    if(f.wadeRating==='not') out.push(['w',`${launch().name} isn’t known for wading. Try a popular wading spot like Settles Bridge, Jones Bridge or Island Ford.`]);
     if(f.startHigh) out.push(['b','Release water at the ramp. Not safe to wade.']);
     if(f.rise) out.push(['b',`Water starts rising at the ramp about ${fmtT(new Date(f.rise.t))}, ${f.rise.into.toFixed(1)} h into your session. Be out of the river before then.`]);
     if(f.afterDark) out.push(['w','Your session runs past legal fishing hours.']);
@@ -1025,9 +1030,15 @@ function tripDesc(){
   return `${TRIP.motor} min up (about ${Math.min(TRIP.motor/60*mph,(L.km-LAUNCHES[0].km)/1.609).toFixed(0)} mi at ${mph} mph), ${TRIP.float} h float back`;
 }
 const RAMP_LABEL={trailer:'Trailer ramp',hand:'Hand-carry only',check:'Unconfirmed'};
+const WADE_LABEL={common:'Popular wading',limited:'Limited wading',not:'Not known for wading'};
+const AFFC='https://atlantaflyfishingclub.org/resources/';
+function wadeLine(L){
+  const lab=L.wade?WADE_LABEL[L.wade]:'No wading info';
+  return `<span><span class="badge wade-${L.wade||'none'}">${lab}</span>${L.wadeNote} <a href="${AFFC}" target="_blank" rel="noopener">More</a></span>`;
+}
 function rampLine(L){return `<span><span class="badge ${L.ramp}">${RAMP_LABEL[L.ramp]}</span><b>${L.name}.</b> ${L.note}</span>`}
 function rampInfoHTML(list,boat,day){
-  const out=list.map(rampLine);
+  const out=boat==='wade'?list.map(L=>wadeLine(L)):list.map(rampLine);
   const trailered=boat==='prop'||boat==='jet'||boat==='drift';
   for(const L of list) if(trailered&&L.ramp==='hand') out.push(`<span class="warn">${L.name} is hand-carry only, so a ${boat==='drift'?'drift boat on a trailer':'motor boat'} can’t launch or take out there.</span>`);
   if(list.some(L=>L.pool==='lower')){

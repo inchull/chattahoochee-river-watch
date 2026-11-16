@@ -158,6 +158,12 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 .tripctl{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
 .tripctl label{min-width:0;max-width:100%}
 .tripctl select,.tripctl input{max-width:100%;min-width:0}
+.fishat{grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-2px 0 2px}
+.fishat label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.fishat input{font:14px var(--f-body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:0;max-width:100%}
+.fishat button{padding:6px 12px}
+.fishat button[aria-pressed="true"]{background:var(--river);color:var(--panel);border-color:var(--river)}
+.whenmsg{grid-column:1/-1;margin:0;font-size:12.5px;color:var(--warn);font-weight:600}
 .rampinfo{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted);display:grid;gap:4px}
 .rampinfo:empty{display:none}
 .badge{display:inline-block;font:600 11px var(--f-body);letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;margin-right:6px;vertical-align:1px}
@@ -222,6 +228,8 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
       <label id="takeLbl" hidden>Take out at<select id="tTake"></select></label>
       <label id="floatLbl">Float back<select id="tFloat"><option value="0">—</option><option value="1">1 h</option><option value="2">2 h</option><option value="3">3 h</option><option value="3.5">3.5 h</option><option value="4">4 h</option><option value="4.5">4.5 h</option><option value="5">5 h</option></select></label>
     </div>
+    <div class="fishat"><label for="tWhen">Fish at</label><input id="tWhen" type="datetime-local" step="900"><button type="button" id="tNow">Now</button></div>
+    <p class="whenmsg" id="whenMsg" hidden></p>
     <p class="rampinfo" id="rampInfo"></p>
     <div class="score" id="score">--<span>SCORE</span></div>
     <div><h3 id="verdict">Loading gauges…</h3><p id="verdictSub">Pulling live USGS readings.</p></div>
@@ -638,8 +646,11 @@ function driftPage(){
   const keep=$('dTo').value; $('dTo').innerHTML=rampOptions(downs); $('dTo').value=downs.some(x=>x.id===keep)?keep:downs[0].id;
   const to=LAUNCHES.find(x=>x.id===$('dTo').value);
   $('dRampInfo').innerHTML=rampInfoHTML([from,to],'kayak',new Date(+new Date($('dDay').value+'T12:00')));
+  { const h=horizon(from); $('dDay').max=dayKey(h);
+    if($('dDay').value>dayKey(h)){ $('dDay').value=dayKey(h); } }
   const [y,m,d]=$('dDay').value.split('-').map(Number), [hh,mm]=($('dTime').value||'07:00').split(':').map(Number);
-  const T=+new Date(y,m-1,d,hh,mm), day=new Date(y,m-1,d);
+  let T=+new Date(y,m-1,d,hh,mm); const day=new Date(y,m-1,d);
+  { const h=+horizon(from); if(T>h){ T=h; } }
   const r=simulateDrift(from,to,T,ctx), mi=(to.km-from.km)/1.609;
   const tile=(k,v,sub)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub||''}</div></div>`;
   const sc=r.score;
@@ -668,7 +679,7 @@ function driftControls(){
   $('dFrom').innerHTML=rampOptions(LAUNCHES.filter(x=>nextRamp(x)));
   $('dFrom').value=nextRamp(launch())?launch().id:'medlock';
   const now=new Date(), t=new Date(Math.ceil(+now/(15*60e3))*15*60e3);
-  $('dDay').value=dayKey(now); $('dDay').min=dayKey(new Date(+now-30*86400e3)); $('dDay').max=dayKey(new Date(+now+7*86400e3));
+  $('dDay').value=dayKey(now); $('dDay').min=dayKey(new Date(+now-30*86400e3)); $('dDay').max=dayKey(horizon(launch()));
   $('dTime').value=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
   for(const id of ['dFrom','dTo','dDay','dTime']) $(id).addEventListener('change',driftPage);
 }
@@ -907,6 +918,12 @@ function stateAt(km,t,ctx){
   let turb=pick('63680'), ec=pick('99407');
   // Forecast hours: release water scours the bed. Measured at Medlock, turbidity rises from about 3 to 9-15 FNU
   // and the E. coli estimate (derived from turbidity) rises about 60%. Past hours use what was actually measured.
+  // Future low-water hours: use the river's typical clear-water reading from the last 2 days
+  // (25th percentile), not whatever a passing release is doing right now.
+  if(tq>=+now && t>+now && water==='low'){
+    const base=k=>{const a=(S[gauge+':'+k]||[]).filter(p=>+p.t>+now-48*H).map(p=>p.v); return a.length?pct(a,0.25):null};
+    const bt=base('63680'), be=base('99407'); if(bt!=null) turb=bt; if(be!=null) ec=be;
+  }
   if(tq>=+now && t>+now && water!=='low'){
     const hi=water==='high';
     if(turb!=null) turb=Math.round((turb+(hi?8:4))*10)/10;
@@ -1063,7 +1080,63 @@ function tripNotes(tr){
   return out;
 }
 
+function renderProjected(ctx,T){
+  const L=launch(), sunT=sun(new Date(T)), tr=tripScore(T,ctx,sunT), f=fishQ(T,L.km,ctx,sunT), st=stateAt(L.km,T,ctx);
+  const cond=f&&!f.dark?f.q:0;
+  const score=tr.score==null?cond:Math.round(0.35*cond+0.65*tr.score);
+  const col=score>=75?'var(--good)':score>=50?'var(--warn)':'var(--bad)';
+  $('score').style.borderColor=col; $('score').innerHTML=score+'<span>SCORE</span>';
+  const verb=TRIP.boat==='wade'?'wade':'launch', when=`${new Date(T).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(new Date(T))}`;
+  $('verdict').textContent=tr.dark||(f&&f.dark)?'Outside fishing hours':score>=75?`Good time to ${verb}`:score>=50?(TRIP.boat==='wade'?'Fishable session':'Fishable trip'):`Poor time to ${verb}`;
+  const end=tr.fEnd?(tr.flags&&tr.flags.drift?` You’d reach ${tr.flags.to} about ${fmtT(new Date(tr.fEnd))}.`:` You’d be ${TRIP.boat==='wade'?'done':'back'} about ${fmtT(new Date(tr.fEnd))}.`):'';
+  $('verdictSub').textContent=`Projected for ${when} at ${L.name}.${end}`;
+  const notes=tr.score==null?[]:tripNotes(tr);
+  if(tr.score!=null&&!notes.length) notes.push(['g','No release water reaches you on this trip.']);
+  const water={low:'Low, normal water at the ramp.',falling:'Water still dropping after a release.',caution:'Release water starting to arrive at the ramp.',high:'Release water at the ramp: high and fast.'}[st&&st.water]||'';
+  const R=[];
+  if(water) R.push([st.water==='low'?'g':st.water==='high'?'b':'w',water]);
+  if(st&&st.turb!=null) R.push([st.turb<5?'g':st.turb<15?'w':'b',`Turbidity about ${st.turb} FNU (projected).`]);
+  if(st&&st.ec!=null) R.push([st.ec<235?'g':'b',`E. coli estimate about ${st.ec}/100 mL (projected).`]);
+  if(st&&st.tf!=null) R.push([st.tf>=45&&st.tf<=65?'g':'w',`Water about ${st.tf.toFixed(0)}°F.`]);
+  R.push(['w',`Sunrise ${fmtT(sunT.rise)}, sunset ${fmtT(sunT.set)}.`]);
+  $('reasons').innerHTML=[...notes,...R].map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
+}
+// ---- Fish at: project the trip to a chosen time, only as far as release schedules are posted ----
+let FISH_AT=null; // null = now
+const pad2=n=>String(n).padStart(2,'0');
+const toLocalInput=d=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+// Latest time we can project to: the end of the last day with a posted schedule.
+// Below Morgan Falls Dam both the Corps (Buford) and Georgia Power (Morgan Falls) schedules are needed.
+function horizon(L){
+  const now=new Date(), endOf=k=>{const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d,23,59)};
+  const sk=SCHED?Object.keys(SCHED.days).sort():[]; let h=sk.length?endOf(sk[sk.length-1]):now;
+  if(L&&L.pool==='lower'){ const mk=MF&&MF.schedule?Object.keys(MF.schedule).sort():[]; const mh=mk.length?endOf(mk[mk.length-1]):now; if(mh<h) h=mh; }
+  return h<now?now:h;
+}
+function syncWhen(){
+  const now=new Date(), h=horizon(launch()), el=$('tWhen');
+  el.min=toLocalInput(now); el.max=toLocalInput(h);
+  if(FISH_AT && FISH_AT>+h){ FISH_AT=null; showWhenMsg(`Schedules are only posted through ${h.toLocaleDateString([], {weekday:'short'})} ${fmtT(h)}, so this switched back to now.`); }
+  if(FISH_AT && FISH_AT<+now-5*60e3) FISH_AT=null;
+  el.value=toLocalInput(FISH_AT?new Date(FISH_AT):now);
+  $('tNow').setAttribute('aria-pressed',FISH_AT?'false':'true');
+}
+function showWhenMsg(t){ const m=$('whenMsg'); m.textContent=t; m.hidden=!t; }
+function whenControls(){
+  $('tWhen').addEventListener('change',()=>{
+    const v=$('tWhen').value; showWhenMsg('');
+    if(!v){ FISH_AT=null; }
+    else {
+      const t=+new Date(v), now=Date.now(), h=+horizon(launch());
+      if(t>h){ showWhenMsg(`The release schedule is only posted through ${new Date(h).toLocaleDateString([], {weekday:'short'})}${launch().pool==='lower'?' (Corps and Georgia Power)':''}. Pick an earlier time.`); }
+      else FISH_AT = t<=now+5*60e3 ? null : t;
+    }
+    syncWhen(); if(LAST) renderWindows();
+  });
+  $('tNow').addEventListener('click',()=>{ FISH_AT=null; showWhenMsg(''); syncWhen(); if(LAST) renderWindows(); });
+}
 function renderVerdict(ctx){
+  if(FISH_AT) return renderProjected(ctx,FISH_AT);
   const {now,condScore,R,phaseTxt}=LAST; const sunT=sun(now);
   const tr=tripScore(+now,ctx,sunT);
   const score=tr.score==null?condScore:Math.round(0.35*condScore+0.65*tr.score);
@@ -1101,6 +1174,7 @@ function dayRow(d,ctx,{isToday,future,meta}){
 function renderWindows(){
   if(!LAST) return;
   const ctx=buildCtx(), {S,now,sched,ev}=ctx;
+  syncWhen();
   renderVerdict(ctx);
   const lastSched=sched.length?sched[sched.length-1].on:null;
   const days=[new Date(now)];
@@ -1201,6 +1275,7 @@ function tripControls(){
   });
 }
 tripControls();
+whenControls();
 driftControls();
 route();
 window.addEventListener('hashchange',()=>{route();window.scrollTo(0,0)});

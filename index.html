@@ -136,6 +136,11 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 .schedlist{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:6px}
 .schedlist li{display:flex;justify-content:space-between;align-items:center;gap:8px;font-family:var(--f-mono);font-size:13px}
 .tripctl{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.rampinfo{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted);display:grid;gap:4px}
+.rampinfo:empty{display:none}
+.badge{display:inline-block;font:600 11px var(--f-body);letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;margin-right:6px;vertical-align:1px}
+.badge.trailer{color:var(--good)}.badge.hand{color:var(--river)}.badge.check{color:var(--warn)}
+.rampinfo .warn{color:var(--bad);font-weight:600}
 .tripctl.top{grid-column:1/-1;margin:0 0 4px;padding-bottom:12px;border-bottom:1px solid var(--line)}
 .tripctl label{display:grid;gap:3px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .tripctl select:disabled{opacity:.55}
@@ -171,10 +176,11 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
       <label>Day<input id="dDay" type="date"></label>
       <label>Start<input id="dTime" type="time" step="900"></label>
     </div>
+    <p class="rampinfo" id="dRampInfo"></p>
     <div class="dsum" id="dSum"></div>
     <ul class="reasons" id="dNotes"></ul>
     <h3 class="sub">Your drift on the good-water map</h3>
-    <div class="mapwrap"><svg id="dmap" class="rmap" viewBox="0 0 640 320" width="100%" role="img" aria-label="Your drift drawn over fishing quality by river location and time"></svg><div class="readout mapRead" id="dRead" hidden></div></div>
+    <div class="mapwrap"><svg id="dmap" class="rmap" viewBox="0 0 640 440" width="100%" role="img" aria-label="Your drift drawn over fishing quality by river location and time"></svg><div class="readout mapRead" id="dRead" hidden></div></div>
     <div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:var(--ink)"></i>Your drift</span></div>
     <p class="foot" id="dFoot"></p>
   </section>
@@ -187,6 +193,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
       <label id="takeLbl" hidden>Take out at<select id="tTake"></select></label>
       <label id="floatLbl">Float back<select id="tFloat"><option value="0">—</option><option value="1">1 h</option><option value="2">2 h</option><option value="3">3 h</option><option value="3.5">3.5 h</option><option value="4">4 h</option><option value="4.5">4.5 h</option><option value="5">5 h</option></select></label>
     </div>
+    <p class="rampinfo" id="rampInfo"></p>
     <div class="score" id="score">--<span>SCORE</span></div>
     <div><h3 id="verdict">Loading gauges…</h3><p id="verdictSub">Pulling live USGS readings.</p></div>
     <ul class="reasons" id="reasons"></ul>
@@ -209,8 +216,8 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 
   <section class="panel">
     <h2 id="mapTitle">Where the good water is</h2>
-    <p class="foot">Each row is a spot on the river, top is the dam, and each column is 15 minutes. Blue is release water moving downstream; green is good fishing water. With a fast boat, stay in the green: fish ahead of the blue band, then run back up behind it. Tap the map for details.</p>
-    <div class="mapwrap"><svg id="rmap" class="rmap" viewBox="0 0 640 320" width="100%" role="img" aria-label="Fishing quality by river location and time of day"></svg><div class="readout mapRead" id="mapRead" hidden></div></div>
+    <p class="foot">Each row is a spot on the river, top is the dam, and each column is 15 minutes. Blue is release water moving downstream; green is good fishing water. With a fast boat, stay in the green: fish ahead of the blue band, then run back up behind it. Below Morgan Falls Dam, Georgia Power runs its own release schedule (404-329-1455), so that band uses the Atlanta gauge’s actual readings and is a rougher forecast. Tap the map for details.</p>
+    <div class="mapwrap"><svg id="rmap" class="rmap" viewBox="0 0 640 440" width="100%" role="img" aria-label="Fishing quality by river location and time of day"></svg><div class="readout mapRead" id="mapRead" hidden></div></div>
     <div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:color-mix(in srgb,var(--river) 45%,var(--panel))"></i>Rising or falling</span></div>
   </section>
 
@@ -244,7 +251,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 
 <script>
 const LAT=33.998, LON=-84.200;
-const SITES={dam:'02334430',settles:'02334653',med:'02335000'};
+const SITES={dam:'02334430',settles:'02334653',med:'02335000',atl:'02336000'};
 const H=3600e3;
 // Timing measured from 41 releases (medians)
 const T={rise:5, peak:8.2, dropAfterOff:7.8, clearAfterOff:12.8, normalAfterOff:15.2, settles:2};
@@ -261,7 +268,7 @@ const relH=d=>{const h=(d-Date.now())/H, a=Math.abs(h), v=a<1?Math.round(a*60)+'
 // USGS posts new readings every 15 min. A full 31-day pull is ~1.8 MB, so it happens once per device;
 // after that a refresh asks USGS only for readings newer than what this browser already has (a few KB),
 // and never more often than once every 2 minutes.
-const CACHE_KEY='usgsCacheV1', MIN_GAP=2*60e3, FULL_DAYS=31;
+const CACHE_KEY='usgsCacheV2', MIN_GAP=2*60e3, FULL_DAYS=31;
 let DATA=null, lastFetch=0, inflight=null;
 function cacheLoad(){
   try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); if(!c) return null;
@@ -275,7 +282,7 @@ function cacheSave(S,fetchedAt){
 async function fetchUSGS(since){
   const range=since?`startDT=${new Date(since).toISOString()}`:`period=P${FULL_DAYS}D`;
   const base=`https://waterservices.usgs.gov/nwis/iv/?format=json&siteStatus=all&${range}`;
-  const urls=[`${base}&sites=${SITES.dam}&parameterCd=00060`,`${base}&sites=${SITES.med}&parameterCd=00060,00065,63680,99407,00010,00045`];
+  const urls=[`${base}&sites=${SITES.dam}&parameterCd=00060`,`${base}&sites=${SITES.med}&parameterCd=00060,00065,63680,99407,00010,00045`,`${base}&sites=${SITES.atl}&parameterCd=00060,00065,63680,99407,00010`];
   const jsons=await Promise.all(urls.map(async u=>{const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json()}));
   const S={};
   for(const ts of jsons.flatMap(j=>j.value.timeSeries)){
@@ -424,7 +431,8 @@ function render(S){
   ].join('');
 
   drawChart(medStage,dam,turb,ecoli,now);
-  LAST={S,ev,base,now,condScore:score,R,phaseTxt};
+  const atlSt=S[SITES.atl+':00065']||[], baseAtl=atlSt.length?pct(atlSt.map(x=>x.v),0.1):null;
+  LAST={S,ev,base,baseAtl,now,condScore:score,R,phaseTxt};
   renderWindows();
   renderSeason(now);
   $('updated').textContent='Updated '+fmtDT(now)+(st?' · latest Medlock reading '+fmtT(st.t):'');
@@ -461,28 +469,38 @@ function renderMap(ctx,o={}){
   const id=o.svg||'rmap', now=ctx.now, day=o.day||mapDay(now), sunT=sun(day);
   const isToday=dayKey(day)===dayKey(now);
   if(!o.svg) $('mapTitle').textContent=`Where the good water is ${isToday?'today':day.toLocaleDateString([], {weekday:'long'})}`;
-  const W=640,Hh=320,L=128,R=8,T=8,B=22, w=W-L-R, h=Hh-T-B;
+  const W=640,Hh=440,L=104,R=8,T=8,B=22, w=W-L-R, h=Hh-T-B;
   const t0=+sunT.rise-30*60e3, t1=+sunT.set+30*60e3, step=15*60e3, cols=Math.ceil((t1-t0)/step);
-  const k0=LAUNCHES[0].km, k1=END_KM, rows=50, dk=(k1-k0)/rows;
-  const cw=w/cols, rh=h/rows, cells=[], X=t=>L+(t-t0)/(t1-t0)*w, Y=km=>T+(km-k0)/(k1-k0)*h;
+  // Two bands: the upper river (dam to Overlook Park) and, below Morgan Falls Dam, the lower river.
+  // The lower band gets more height per mile so its closely spaced ramps stay readable.
+  const k0=LAUNCHES[0].km, kU=58.3, kL=59.4, k1=END_KM, gap=18, hU=Math.round((h-gap)*0.64), hL=h-gap-hU;
+  const Y=km=>km<=kU+0.3 ? T+(Math.min(km,kU)-k0)/(kU-k0)*hU : T+hU+gap+(Math.max(km,kL)-kL)/(k1-kL)*hL;
+  const rowsU=56, rowsL=28, rows=rowsU+rowsL, rhU=hU/rowsU, rhL=hL/rowsL;
+  const rowY=r=>r<rowsU?T+r*rhU:T+hU+gap+(r-rowsU)*rhL, rowH=r=>r<rowsU?rhU:rhL;
+  const rowKm=r=>r<rowsU?k0+(r+0.5)*(kU-k0)/rowsU:kL+(r-rowsU+0.5)*(k1-kL)/rowsL;
+  const cw=w/cols, rh=rhU, cells=[], X=t=>L+(t-t0)/(t1-t0)*w;
   let g='';
   for(let r=0;r<rows;r++){
-    const km=k0+(r+0.5)*dk;
+    const km=rowKm(r);
     for(let c=0;c<cols;c++){
       const t=t0+(c+0.5)*step, f=fishQ(t,km,ctx,sunT);
       let fill='var(--line)', st=null, q=null;
       if(f&&f.s){ st=f.s.water; q=f.q;
         fill= st==='high'?'var(--river)': (st==='caution'||st==='falling')?'color-mix(in srgb,var(--river) 45%,var(--panel))': heat(q); }
       cells.push({r,c,km,t,st,q,s:f&&f.s});
-      g+=`<rect x="${(L+c*cw).toFixed(1)}" y="${(T+r*rh).toFixed(1)}" width="${(cw+0.4).toFixed(1)}" height="${(rh+0.4).toFixed(1)}" fill="${fill}"/>`;
+      g+=`<rect x="${(L+c*cw).toFixed(1)}" y="${rowY(r).toFixed(1)}" width="${(cw+0.4).toFixed(1)}" height="${(rowH(r)+0.4).toFixed(1)}" fill="${fill}"/>`;
     }
   }
   const marked=o.ramps||[TRIP.launch];
   for(const lp of LAUNCHES){
     const y=Y(lp.km), on=marked.includes(lp.id);
     g+=`<line x1="${L-4}" x2="${L+w}" y1="${y}" y2="${y}" stroke="var(--ink)" stroke-width="${on?1.6:0.6}" opacity="${on?0.9:0.3}"/>`;
-    g+=`<text x="${L-7}" y="${Math.min(Math.max(y+3.5,T+9),T+h)}" text-anchor="end" class="${on?'ramp':''}">${lp.name.replace(' (Lower Pool)','').replace('Chattahoochee River Park','Chatt. River Park')}</text>`;
+    const ly=lp.id==='overlook'?y-2:lp.id==='mfpark'?y+9:Math.min(Math.max(y+3.5,T+9),T+h);
+    g+=`<text x="${L-7}" y="${ly}" text-anchor="end" class="${on?'ramp':''}">${SHORT[lp.id]||lp.name}</text>`;
   }
+  // Morgan Falls Dam and the delayed-harvest section
+  { const yd=T+hU+gap/2; g+=`<rect x="${L-4}" y="${yd-3}" width="${w+4}" height="6" fill="var(--ink)"/><text x="${L+w-4}" y="${yd+3.5}" text-anchor="end" style="fill:var(--panel);font-weight:600;font-size:9px">MORGAN FALLS DAM</text>`;
+    const y1=Y(DH.from), y2=Y(DH.to); g+=`<rect x="${L+w-5}" y="${y1}" width="5" height="${y2-y1}" fill="#f2c14e"/><text x="${L+w-9}" y="${y1+11}" text-anchor="end" style="fill:var(--ink);font-weight:600">Delayed harvest</text>`; }
   for(let hr=new Date(t0).getHours()+1; ; hr++){
     const t=+day+hr*H; if(t>t1) break; const x=X(t);
     if(hr%2===0) g+=`<text x="${x}" y="${Hh-6}" text-anchor="middle">${fmtH(t)}</text>`;
@@ -502,16 +520,17 @@ function renderMap(ctx,o={}){
   }
   g+=`<rect class="mapSel" width="${cw}" height="${rh}" fill="none" stroke="var(--ink)" stroke-width="1.5" style="display:none"/>`;
   const svg=$(id); svg.setAttribute('viewBox',`0 0 ${W} ${Hh}`); svg.innerHTML=g;
-  MAPS[id]={cells,cols,rows,L,T,w,h,W,Hh,cw,rh,read:o.read||'mapRead'};
+  MAPS[id]={cells,cols,rows,L,T,w,h,W,Hh,cw,rowY,rowH,read:o.read||'mapRead'};
 }
 function mapHover(ev){
   const id=ev.currentTarget.id, M=MAPS[id]; if(!M) return;
-  const box=ev.currentTarget.getBoundingClientRect(), {L,T,w,h,W,Hh,cols,rows,cw,rh}=M;
+  const box=ev.currentTarget.getBoundingClientRect(), {L,T,w,h,W,Hh,cols,rows,cw,rowY,rowH}=M;
   const vx=(ev.clientX-box.left)/box.width*W, vy=(ev.clientY-box.top)/box.height*Hh;
   if(vx<L||vx>L+w||vy<T||vy>T+h) return;
-  const c=Math.min(cols-1,Math.floor((vx-L)/cw)), r=Math.min(rows-1,Math.floor((vy-T)/rh));
-  const cell=M.cells[r*cols+c];
-  const sel=ev.currentTarget.querySelector('.mapSel'); sel.setAttribute('x',L+c*cw); sel.setAttribute('y',T+r*rh); sel.style.display='';
+  let r=0; for(let i=0;i<rows;i++) if(vy>=rowY(i)) r=i;
+  if(vy>rowY(r)+rowH(r)) return; // in the dam gap
+  const c=Math.min(cols-1,Math.floor((vx-L)/cw)), cell=M.cells[r*cols+c];
+  const sel=ev.currentTarget.querySelector('.mapSel'); sel.setAttribute('x',L+c*cw); sel.setAttribute('y',rowY(r)); sel.setAttribute('height',rowH(r)); sel.style.display='';
   const near=LAUNCHES.reduce((a,b)=>Math.abs(b.km-cell.km)<Math.abs(a.km-cell.km)?b:a);
   const mi=Math.abs(near.km-cell.km)/1.609, where=mi<0.4?`at ${near.name}`:`${mi.toFixed(1)} mi ${cell.km>near.km?'below':'above'} ${near.name}`;
   const label={high:'Release water: high and fast',caution:'Water rising',falling:'Falling back after a release',low:'Low, normal water'}[cell.st]||'No data';
@@ -538,10 +557,11 @@ function simulateDrift(from,to,T,ctx){
 function driftPage(){
   if(!LAST) return;
   const ctx=buildCtx(), from=LAUNCHES.find(x=>x.id===$('dFrom').value)||LAUNCHES[0];
-  const downs=LAUNCHES.filter(x=>x.km>from.km);
-  if(!downs.length){ $('dSum').innerHTML=''; $('dNotes').innerHTML='<li><i class="dot w"></i><span>Morgan Falls is the last ramp. Pick a put-in upstream of it.</span></li>'; return; }
+  const downs=LAUNCHES.filter(x=>x.km>from.km&&x.pool===from.pool);
+  if(!downs.length){ $('dSum').innerHTML=''; $('dNotes').innerHTML='<li><i class="dot w"></i><span>No ramp below this one in the same stretch. Morgan Falls Dam blocks drifts between the upper and lower river.</span></li>'; return; }
   const keep=$('dTo').value; $('dTo').innerHTML=rampOptions(downs); $('dTo').value=downs.some(x=>x.id===keep)?keep:downs[0].id;
   const to=LAUNCHES.find(x=>x.id===$('dTo').value);
+  $('dRampInfo').innerHTML=rampInfoHTML([from,to],'kayak',new Date(+new Date($('dDay').value+'T12:00')));
   const [y,m,d]=$('dDay').value.split('-').map(Number), [hh,mm]=($('dTime').value||'07:00').split(':').map(Number);
   const T=+new Date(y,m-1,d,hh,mm), day=new Date(y,m-1,d);
   const r=simulateDrift(from,to,T,ctx), mi=(to.km-from.km)/1.609;
@@ -558,7 +578,7 @@ function driftPage(){
   if(r.dark) N.push(['w','The drift runs outside legal fishing hours (30 min before sunrise to 30 min after sunset).']);
   if(r.muddy) N.push(['w','Stained water (15+ FNU) for part of the drift.']);
   if(r.ecHi) N.push(['w','E. coli estimate over 235 for part of the drift. Limit skin contact.']);
-  if(to.id==='morganfalls') N.push(['w','The last stretch into Morgan Falls is slow reservoir water, so expect a longer drift than shown.']);
+  if(to.id==='overlook') N.push(['w','The last stretch into Morgan Falls is slow reservoir water, so expect a longer drift than shown.']);
   if(!N.length) N.push(['g','Clean drift: no release water, clear water, inside legal hours.']);
   $('dNotes').innerHTML=N.map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
   renderMap(ctx,{svg:'dmap',read:'dRead',day,path:r.pts,ramps:[from.id,to.id]});
@@ -566,8 +586,8 @@ function driftPage(){
   $('dFoot').textContent=`${dayKey(day)<dayKey(ctx.now)?'Past day: uses the actual dam releases.':posted?'Uses the Corps schedule posted for this day.':'The Corps hasn’t posted this day’s schedule, so this assumes no new release. Releases ran every day of the last 60.'} Clarity, E. coli and temperature come from the Medlock gauge.`;
 }
 function driftControls(){
-  $('dFrom').innerHTML=rampOptions(LAUNCHES.slice(0,-1));
-  $('dFrom').value=TRIP.launch&&TRIP.launch!=='morganfalls'?TRIP.launch:'medlock';
+  $('dFrom').innerHTML=rampOptions(LAUNCHES.filter(x=>nextRamp(x)));
+  $('dFrom').value=nextRamp(launch())?launch().id:'medlock';
   const now=new Date(), t=new Date(Math.ceil(+now/(15*60e3))*15*60e3);
   $('dDay').value=dayKey(now); $('dDay').min=dayKey(new Date(+now-30*86400e3)); $('dDay').max=dayKey(new Date(+now+7*86400e3));
   $('dTime').value=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
@@ -671,43 +691,63 @@ const PROFILE=[
   {km:13.7,rise:2.0, peak:3.8, wade:6.8, settle:8.0,  ft:4.8},  // 02334653 above McGinnis Ferry
   {km:29.7,rise:5.0, peak:8.2, wade:11.8,settle:15.0, ft:2.1},  // 02335000 Medlock
   {km:46.0,rise:9.2, peak:12.0,wade:13.9,settle:17.0, ft:0.9},  // 02335450 above Roswell
-  {km:58.3,rise:12.4,peak:14.9,wade:15.5,settle:18.5, ft:0.7}]; // Morgan Falls: extrapolated, no clean gauge (reservoir pool)
+  {km:58.3,rise:12.4,peak:14.9,wade:15.5,settle:18.5, ft:0.7},  // Overlook Park: extrapolated (Morgan Falls pool)
+  // Below Morgan Falls Dam, Georgia Power re-times the water. Only loosely tied to Buford (7-11 matched releases).
+  {km:59.1,rise:16.5,peak:19.8,wade:17.1,settle:17.8, ft:0.8},  // 02335815 below Morgan Falls Dam
+  {km:75.0,rise:17.5,peak:24.0,wade:23.6,settle:25.5, ft:1.0}]; // 02336000 at Atlanta (Paces Ferry)
 function prof(km){
   const P=PROFILE; if(km<=P[0].km) return {...P[0]}; if(km>=P[P.length-1].km) return {...P[P.length-1]};
   const i=P.findIndex(p=>p.km>=km), a=P[i-1], b=P[i], f=(km-a.km)/(b.km-a.km), o={km};
   for(const k of ['rise','peak','wade','settle','ft']) o[k]=a[k]+(b[k]-a[k])*f;
   return o;
 }
-// River km below the dam, measured along the USGS NHDPlus flowline
+// River km below the dam, measured along the USGS NHDPlus flowline.
+// ramp: 'trailer' = boat ramp for trailered boats; 'hand' = canoe/kayak, carry in; 'check' = status unconfirmed.
+// pool: Morgan Falls Dam splits the river; you can't drift or motor between 'upper' and 'lower'.
 const LAUNCHES=[
-  {id:'dam',name:'Buford Dam (Lower Pool)',km:0.7},
-  {id:'settles',name:'Settles Bridge',km:10.3},
-  {id:'mcginnis',name:'McGinnis Ferry',km:16.6},
-  {id:'rogers',name:'Rogers Bridge',km:19.8},
-  {id:'abbotts',name:'Abbotts Bridge',km:22.4},
-  {id:'medlock',name:'Medlock Bridge',km:29.7},
-  {id:'jones',name:'Jones Bridge',km:34.8},
-  {id:'holcomb',name:'Holcomb Bridge',km:38.5},
-  {id:'islandford',name:'Island Ford',km:47.9},
-  {id:'crpark',name:'Chattahoochee River Park',km:53.1},
-  {id:'morganfalls',name:'Morgan Falls',km:58.3}];
+  {id:'dam',name:'Buford Dam (Lower Pool)',km:0.7,ramp:'trailer',pool:'upper',note:'Corps park ramp below the dam. PFD required from the dam to GA 20.'},
+  {id:'bowmans',name:'Bowmans Island',km:4.4,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.'},
+  {id:'settles',name:'Settles Bridge',km:10.3,ramp:'hand',pool:'upper',note:'Hand-launch only: carry about 0.1 mi from the lot. No trailers.'},
+  {id:'mcginnis',name:'McGinnis Ferry',km:16.6,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.'},
+  {id:'rogers',name:'Rogers Bridge',km:19.8,ramp:'hand',pool:'upper',note:'Hand-launch only, no motors. NPS lists it as temporarily closed; check before going.'},
+  {id:'abbotts',name:'Abbotts Bridge',km:22.4,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.'},
+  {id:'medlock',name:'Medlock Bridge',km:29.7,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes. Lower end of the artificial-lures-only stretch.'},
+  {id:'jones',name:'Jones Bridge',km:34.8,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.'},
+  {id:'garrard',name:'Garrard Landing (Holcomb Br.)',km:38.5,ramp:'hand',pool:'upper',note:'Across from the Holcomb Bridge unit. Canoe only; the driveway is closed to vehicles, so carry in.'},
+  {id:'islandford',name:'Island Ford',km:47.9,ramp:'hand',pool:'upper',note:'Park HQ. Canoe-only launch.'},
+  {id:'azalea',name:'Azalea Park (Roswell)',km:52.4,ramp:'check',pool:'upper',note:'City of Roswell park with river access; launch type not confirmed.'},
+  {id:'overlook',name:'Overlook Park (Morgan Falls)',km:58.3,ramp:'check',pool:'upper',note:'On Bull Sluice Lake above Morgan Falls Dam; slow lake water. Launch type not confirmed.'},
+  {id:'mfpark',name:'Morgan Falls Park (below dam)',km:59.4,ramp:'check',pool:'lower',note:'First access below Morgan Falls Dam. Georgia Power releases: 404-329-1455. Launch type not confirmed.'},
+  {id:'johnsonferry',name:'Johnson Ferry North',km:62.9,ramp:'trailer',pool:'lower',note:'NPS ramp for boats and canoes. Delayed-harvest water starts at Sope Creek, about 2 mi down.'},
+  {id:'powers',name:'Powers Island (Cochran Shoals)',km:69.2,ramp:'hand',pool:'lower',note:'Canoe-only launch, in the delayed-harvest section.'},
+  {id:'palisades',name:'Palisades (Whitewater Cr. / Akers Mill)',km:71.5,ramp:'hand',pool:'lower',note:'Canoe-only launches on both banks, in the delayed-harvest section.'},
+  {id:'pacesmill',name:'Paces Mill (US 41)',km:73.4,ramp:'trailer',pool:'lower',note:'NPS ramp for boats and canoes. Lower end of the delayed-harvest section.'}];
+const SHORT={dam:'Buford Dam',bowmans:'Bowmans Is.',settles:'Settles Br.',mcginnis:'McGinnis Fy.',rogers:'Rogers Br.',abbotts:'Abbotts Br.',medlock:'Medlock Br.',jones:'Jones Br.',garrard:'Garrard Ldg.',islandford:'Island Ford',azalea:'Azalea Park',overlook:'Overlook Pk.',mfpark:'Morgan Falls Pk.',johnsonferry:'Johnson Ferry',powers:'Powers Is.',palisades:'Palisades',pacesmill:'Paces Mill'};
+// Delayed harvest: Sope Creek to US 41, Nov 1 - May 14
+const DH={from:66.4,to:73.4};
+const inDH=d=>{const m=d.getMonth(), day=d.getDate(); return m>=10 || m<=3 || (m===4&&day<=14)};
 const END_KM=LAUNCHES[LAUNCHES.length-1].km;
 // Drift-only trips (no motor) end at the next ramp downstream
-const nextRamp=L=>LAUNCHES[LAUNCHES.indexOf(L)+1];
+const nextRamp=L=>{const n=LAUNCHES[LAUNCHES.indexOf(L)+1]; return n&&n.pool===L.pool?n:null};
+const poolOf=L=>LAUNCHES.filter(x=>x.pool===L.pool);
 // Drift speed with fishing stops, km/h: about 1.3 mph at low water, faster as release water arrives
 const DRIFT_KMH={low:2.1,falling:2.8,caution:3.5,high:4.8};
 const MED_KM=29.7;
 // Net upstream speed: a prop boat about 8 mph, a jet boat about 20 mph
 const motorKmh=()=>TRIP.boat==='jet'?32:13;
-const launch=()=>LAUNCHES.find(l=>l.id===TRIP.launch)||LAUNCHES[4];
+const launch=()=>LAUNCHES.find(l=>l.id===TRIP.launch)||LAUNCHES.find(l=>l.id==='medlock');
 
 function stateAt(km,t,ctx){
   // Water at river km `km` at time t: {water, turb, ec, tf}
   const {S,base,now,rel}=ctx, p=prof(km); let water='low';
-  const st=S[SITES.med+':00065']||[];
+  const st=S[SITES.med+':00065']||[], lower=km>=59, atl=S[SITES.atl+':00065']||[];
   if(Math.abs(km-MED_KM)<0.5 && t<=+now){
     const v=valAt(st,t); if(v==null) return null;
     water = v<=base+0.5?'low': v<=base+0.8?'falling':'high';
+  } else if(lower && t<=+now && ctx.baseAtl!=null){
+    // Below Morgan Falls Dam: use what the Atlanta gauge actually measured (Morgan Falls re-times releases)
+    const v=valAt(atl,t+(PROFILE[PROFILE.length-1].rise-p.rise)*H) ?? valAt(atl,t); if(v==null) return null;
+    water = v<=ctx.baseAtl+0.4?'low': v<=ctx.baseAtl+0.7?'falling':'high';
   } else {
     for(const r of rel){
       const on=+r.on, off=+(r.off||new Date(on+2.5*H));
@@ -718,8 +758,10 @@ function stateAt(km,t,ctx){
   }
   // Clarity, E. coli and temperature are only measured at Medlock. Upstream, the same water reaches
   // Medlock later, so read Medlock at t + (Medlock lag - local lag).
-  const tq=Math.min(+now, t+(PROFILE[3].rise-p.rise)*H);
-  const pick=k=>{const a=S[SITES.med+':'+k]||[];return tq<+now?valAt(a,tq):(a.length?a[a.length-1].v:null)};
+  // Below Morgan Falls, clarity, E. coli and temperature come from the Atlanta gauge instead.
+  const gauge=lower?SITES.atl:SITES.med, ref=lower?PROFILE[PROFILE.length-1]:PROFILE[3];
+  const tq=Math.min(+now, t+(ref.rise-p.rise)*H);
+  const pick=k=>{const a=S[gauge+':'+k]||[];return tq<+now?valAt(a,tq):(a.length?a[a.length-1].v:null)};
   const tc=pick('00010');
   let turb=pick('63680'), ec=pick('99407');
   // Forecast hours: release water scours the bed. Measured at Medlock, turbidity rises from about 3 to 9-15 FNU
@@ -744,11 +786,11 @@ function tripPath(T){
   const L=launch(), mot=TRIP.motor*60e3, fl=TRIP.float*H;
   const reach=TRIP.motor/60*motorKmh();
   if(L.id==='dam'){
-    const far=Math.min(L.km+reach, END_KM);
+    const pool=poolOf(L), far=Math.min(L.km+reach, pool[pool.length-1].km);
     return {floatFirst:true, fStart:T, fEnd:T+fl, mStart:T+fl, end:T+fl+mot,
       floatKm:f=>L.km+(far-L.km)*f, motorKm:f=>far-(far-L.km)*f, turn:far};
   }
-  const turn=Math.max(LAUNCHES[0].km, L.km-reach);
+  const turn=Math.max(poolOf(L)[0].km, L.km-reach);
   return {floatFirst:false, mStart:T, fStart:T+mot, fEnd:T+mot+fl, end:T+mot+fl,
     motorKm:f=>L.km-(L.km-turn)*f, floatKm:f=>turn+(L.km-turn)*f, turn};
 }
@@ -763,7 +805,13 @@ function fishQ(t,km,ctx,sunT){
   return {q:Math.max(0,Math.min(100,q)),s};
 }
 // Takeout for one-way drifts: the chosen ramp if it is downstream of the launch, else the next one
-function takeout(L){const t=LAUNCHES.find(x=>x.id===TRIP.take); return t&&t.km>L.km?t:(nextRamp(L)||L)}
+// Default take-out: the next ramp downstream in the same pool that this boat can use
+function takeout(L){
+  const t=LAUNCHES.find(x=>x.id===TRIP.take); if(t&&t.km>L.km&&t.pool===L.pool) return t;
+  const trailered=TRIP.boat==='prop'||TRIP.boat==='jet'||TRIP.boat==='drift';
+  const downs=LAUNCHES.filter(x=>x.km>L.km&&x.pool===L.pool);
+  return (trailered&&downs.find(x=>x.ramp==='trailer'))||downs[0]||L;
+}
 // Wading: stay at the ramp for TRIP.float hours. Release water at the ramp is unsafe, so it scores zero.
 function wadeScore(T,ctx,sunT){
   const L=launch(), dur=(TRIP.float||3)*H, step=15*60e3; let sum=0,n=0,prev=null;
@@ -889,10 +937,10 @@ function renderVerdict(ctx){
 }
 
 function buildCtx(){
-  const {S,ev,base,now}=LAST;
+  const {S,ev,base,baseAtl,now}=LAST;
   const sched=schedReleases();
   const rel=[...ev.map(e=>({...e,src:'gauge'})), ...sched.filter(s=>!ev.some(e=>Math.abs(e.on-s.on)<2*H))];
-  return {S,base,now,rel,sched,ev};
+  return {S,base,baseAtl,now,rel,sched,ev};
 }
 function dayRow(d,ctx,{isToday,future,meta}){
   const {slots,wins}=dayWindows(d,ctx);
@@ -952,11 +1000,23 @@ function tripDesc(){
   if(L.id==='dam') return `${TRIP.float} h float down, ${TRIP.motor} min motor back at about ${mph} mph`;
   return `${TRIP.motor} min up (about ${Math.min(TRIP.motor/60*mph,(L.km-LAUNCHES[0].km)/1.609).toFixed(0)} mi at ${mph} mph), ${TRIP.float} h float back`;
 }
+const RAMP_LABEL={trailer:'Trailer ramp',hand:'Hand-carry only',check:'Unconfirmed'};
+function rampLine(L){return `<span><span class="badge ${L.ramp}">${RAMP_LABEL[L.ramp]}</span><b>${L.name}.</b> ${L.note}</span>`}
+function rampInfoHTML(list,boat,day){
+  const out=list.map(rampLine);
+  const trailered=boat==='prop'||boat==='jet'||boat==='drift';
+  for(const L of list) if(trailered&&L.ramp==='hand') out.push(`<span class="warn">${L.name} is hand-carry only, so a ${boat==='drift'?'drift boat on a trailer':'motor boat'} can’t launch or take out there.</span>`);
+  if(list.some(L=>L.pool==='lower')){
+    const dh=inDH(day||new Date());
+    out.push(`<span><span class="badge check">Delayed harvest</span>Sope Creek to US 41 (Paces Mill), Nov 1–May 14: ${dh?'<b>in season now</b>. Catch and release only, artificial lures with a single hook.':'out of season; general trout rules apply.'} Check GA DNR rules before fishing.</span>`);
+  }
+  return out.join('');
+}
 function rampOptions(list){return list.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
 function tripControls(){
   $('tLaunch').innerHTML=rampOptions(LAUNCHES);
   const ids=['tBoat','tLaunch','tMotor','tTake','tFloat'];
-  const fillTake=()=>{ const L=launch(); $('tTake').innerHTML=LAUNCHES.filter(x=>x.km>L.km).map(x=>`<option value="${x.id}">${x.name}</option>`).join(''); $('tTake').value=takeout(L).id; };
+  const fillTake=()=>{ const L=launch(); $('tTake').innerHTML=LAUNCHES.filter(x=>x.km>L.km&&x.pool===L.pool).map(x=>`<option value="${x.id}">${x.name}</option>`).join(''); $('tTake').value=takeout(L).id; };
   const sync=()=>{
     const b=TRIP.boat, oneWay=b==='drift'||(b!=='wade'&&TRIP.motor===0);
     $('motorLbl').hidden=b==='drift'||b==='wade';
@@ -964,13 +1024,15 @@ function tripControls(){
     $('floatLbl').hidden=oneWay;
     $('floatLbl').firstChild.textContent=b==='wade'?'Wade for':'Float back';
     fillTake();
+    $('rampInfo').innerHTML=rampInfoHTML(TRIP.boat!=='wade'&&(TRIP.boat==='drift'||TRIP.motor===0)&&nextRamp(launch())?[launch(),takeout(launch())]:[launch()],TRIP.boat,new Date());
   };
   // Sensible starting points; everything stays adjustable after
   const defaults=(boat,launchId)=>{
     if(boat==='wade') return {motor:0,float:3};
     if(boat==='drift') return {motor:0,float:0};
     if(boat==='jet') return {motor:20,float:4};
-    return (launchId==='medlock'||launchId==='morganfalls')?{motor:45,float:4}:{motor:0,float:0};
+    const Lx=LAUNCHES.find(x=>x.id===launchId);
+    return (launchId==='medlock'||!nextRamp(Lx))?{motor:45,float:4}:{motor:0,float:0};
   };
   if(!TRIP.boat) TRIP.boat='prop';
   $('tBoat').value=TRIP.boat; $('tLaunch').value=TRIP.launch; $('tMotor').value=TRIP.motor; $('tFloat').value=TRIP.float; sync();

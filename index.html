@@ -202,20 +202,61 @@ const fmtDT=d=>{const today=new Date();const tom=new Date(Date.now()+86400e3);
   return day+fmtT(d)};
 const relH=d=>{const h=(d-Date.now())/H, a=Math.abs(h), v=a<1?Math.round(a*60)+' min':a.toFixed(1)+' h'; return h>=0?'in '+v:v+' ago'};
 
-async function load(){
-  $('verdict').textContent='Loading gauges…';
-  const base='https://waterservices.usgs.gov/nwis/iv/?format=json&siteStatus=all&period=P31D';
+// ---- Gauge data: cached, incremental, throttled ----
+// USGS posts new readings every 15 min. A full 31-day pull is ~1.8 MB, so it happens once per device;
+// after that a refresh asks USGS only for readings newer than what this browser already has (a few KB),
+// and never more often than once every 2 minutes.
+const CACHE_KEY='usgsCacheV1', MIN_GAP=2*60e3, FULL_DAYS=31;
+let DATA=null, lastFetch=0, inflight=null;
+function cacheLoad(){
+  try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); if(!c) return null;
+    const S={}; for(const [k,arr] of Object.entries(c.S)) S[k]=arr.map(([t,v])=>({t:new Date(t),v}));
+    return {S,fetchedAt:c.fetchedAt};}catch(e){return null}
+}
+function cacheSave(S,fetchedAt){
+  try{const o={}; for(const [k,arr] of Object.entries(S)) o[k]=arr.map(p=>[+p.t,p.v]);
+    localStorage.setItem(CACHE_KEY,JSON.stringify({S:o,fetchedAt}));}catch(e){}
+}
+async function fetchUSGS(since){
+  const range=since?`startDT=${new Date(since).toISOString()}`:`period=P${FULL_DAYS}D`;
+  const base=`https://waterservices.usgs.gov/nwis/iv/?format=json&siteStatus=all&${range}`;
   const urls=[`${base}&sites=${SITES.dam}&parameterCd=00060`,`${base}&sites=${SITES.med}&parameterCd=00060,00065,63680,99407,00010,00045`];
-  let jsons;
-  try{ jsons=await Promise.all(urls.map(async u=>{const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json()})); }
-  catch(e){ $('verdict').innerHTML='<span class="err">Can’t reach USGS</span>'; $('verdictSub').textContent='waterservices.usgs.gov did not answer ('+e.message+'). Check your connection and tap Refresh.'; return; }
+  const jsons=await Promise.all(urls.map(async u=>{const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json()}));
   const S={};
   for(const ts of jsons.flatMap(j=>j.value.timeSeries)){
     const site=ts.sourceInfo.siteCode[0].value, p=ts.variable.variableCode[0].value;
     const blk=ts.values.find(b=>b.value.length); if(!blk) continue;
     S[site+':'+p]=blk.value.filter(v=>v.value!=='-999999').map(v=>({t:new Date(v.dateTime),v:+v.value}));
   }
-  render(S);
+  return S;
+}
+function mergeSeries(old,add){
+  const cut=Date.now()-FULL_DAYS*86400e3, out={};
+  for(const k of new Set([...Object.keys(old),...Object.keys(add)])){
+    const m=new Map(); for(const p of (old[k]||[])) m.set(+p.t,p); for(const p of (add[k]||[])) m.set(+p.t,p);
+    out[k]=[...m.values()].filter(p=>+p.t>=cut).sort((a,b)=>a.t-b.t);
+  }
+  return out;
+}
+async function load(force){
+  if(inflight) return inflight;
+  if(!DATA){ const c=cacheLoad(); if(c){ DATA=c; lastFetch=c.fetchedAt; render(DATA.S); } }
+  const age=Date.now()-lastFetch;
+  if(DATA && age<MIN_GAP){ if(force) $('updated').textContent=`Up to date. Checked USGS ${Math.max(1,Math.round(age/1000))} s ago; new readings arrive every 15 min.`; return; }
+  if(!DATA) $('verdict').textContent='Loading gauges…';
+  inflight=(async()=>{
+    try{
+      // Incremental only if the cache covers the window; overlap 1 h so late-posted readings are picked up
+      const newest=DATA?Math.max(...Object.values(DATA.S).map(a=>a.length?+a[a.length-1].t:0)):0;
+      const fresh=DATA&&newest>Date.now()-3*86400e3 ? await fetchUSGS(newest-H) : await fetchUSGS(null);
+      const S=DATA&&newest>Date.now()-3*86400e3 ? mergeSeries(DATA.S,fresh) : mergeSeries({},fresh);
+      lastFetch=Date.now(); DATA={S,fetchedAt:lastFetch}; cacheSave(S,lastFetch); render(S);
+    }catch(e){
+      if(DATA){ $('updated').textContent=`Couldn’t reach USGS (${e.message}). Showing readings from ${fmtDT(new Date(lastFetch))}.`; }
+      else { $('verdict').innerHTML='<span class="err">Can’t reach USGS</span>'; $('verdictSub').textContent='waterservices.usgs.gov did not answer ('+e.message+'). Check your connection and tap Refresh.'; }
+    }finally{ inflight=null }
+  })();
+  return inflight;
 }
 
 function last(a){return a&&a.length?a[a.length-1]:null}
@@ -692,10 +733,10 @@ function tripControls(){
   });
 }
 tripControls();
-$('refresh').addEventListener('click',()=>{loadSchedule().then(renderWindows);load()});
+$('refresh').addEventListener('click',()=>{loadSchedule().then(renderWindows);load(true)});
 loadSchedule().then(renderWindows);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden) load()});
-setInterval(load,10*60e3);
+setInterval(()=>{if(!document.hidden) load()},10*60e3);
 load();
 </script>
 </body>

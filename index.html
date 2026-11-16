@@ -722,7 +722,10 @@ function renderWindows(){
   }
   const open=$('logMore')&&$('logMore').open;
   $('log').innerHTML=rows.slice(0,3).join('')+(rows.length>3?`<details id="logMore"${open?' open':''}><summary><span class="chev" aria-hidden="true">▾</span> <span class="more">Show ${rows.length-3} more days</span><span class="less">Show fewer</span></summary>${rows.slice(3).join('')}</details>`:'');
-  $('logNote').textContent='Launch scores from what the Medlock gauge actually recorded. Dam times are when outflow at the dam passed 2,000 cfs.';
+  $('logNote').textContent=(launch().id==='medlock'
+    ? 'Launch scores for Medlock Bridge from what the Medlock gauge actually recorded.'
+    : `Launch scores for ${launch().name} from the actual dam release times, timed to this ramp, plus clarity, E. coli and temperature measured at Medlock.`)
+    +` Uses your current trip settings. Dam times are when outflow at the dam passed 2,000 cfs.`;
 }
 
 function tripControls(){

@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-title" content="Hooch Watch">
 <meta name="theme-color" content="#0f2a2e">
 <title>Hooch Watch</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
@@ -68,9 +71,20 @@ ul.reasons li{display:flex;gap:8px;align-items:flex-start}
 .status{font-weight:600}
 .chartwrap{position:relative}
 .mapwrap{position:relative;margin-top:6px}
-#rmap{display:block;touch-action:pan-y;cursor:crosshair}
-#rmap text{fill:var(--muted);font:10.5px var(--f-body)}
-#rmap .ramp{fill:var(--ink);font-weight:600}
+.rmap{display:block;touch-action:pan-y;cursor:crosshair}
+.rmap text{fill:var(--muted);font:10.5px var(--f-body)}
+.rmap .ramp{fill:var(--ink);font-weight:600}
+.hdr-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tabs{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.tabs a{font:600 13px var(--f-body);color:var(--muted);text-decoration:none;padding:7px 12px}
+.tabs a[aria-current="page"]{background:var(--river);color:var(--panel)}
+.tabs a:focus-visible{outline:2px solid var(--river);outline-offset:-2px}
+.tripctl input{font:14px var(--f-body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.dsum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0 4px}
+@media(min-width:560px){.dsum{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.dsum .tile{background:var(--bg)}
+h3.sub{font:700 15px/1.2 var(--f-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 4px}
+.mapRead{position:static;display:block;margin-top:6px;box-shadow:none;white-space:normal}
 #mapRead{position:static;display:block;margin-top:6px;box-shadow:none;white-space:normal}
 #chart{touch-action:pan-y;cursor:crosshair;display:block}
 .readout{position:absolute;top:6px;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.45;box-shadow:0 2px 8px color-mix(in srgb,var(--ink) 15%,transparent);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -145,13 +159,30 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 <main>
   <header>
     <h1>Hooch Watch<small id="sub">Chattahoochee River below Buford Dam</small></h1>
-    <button id="refresh" type="button">Refresh</button>
+    <div class="hdr-right"><nav class="tabs" aria-label="Views"><a href="#" id="tabPlan">Planner</a><a href="#drift" id="tabDrift">Drift calculator</a></nav><button id="refresh" type="button">Refresh</button></div>
   </header>
+
+  <section class="panel" id="driftPage" hidden>
+    <h2>Drift calculator</h2>
+    <p class="foot">Pick a put-in and a take-out to see how long the drift takes and what water you’ll be on. Drift speed is about 1.3 mph in normal water with fishing stops, and up to about 3 mph on release water.</p>
+    <div class="tripctl">
+      <label>Put in<select id="dFrom"></select></label>
+      <label>Take out<select id="dTo"></select></label>
+      <label>Day<input id="dDay" type="date"></label>
+      <label>Start<input id="dTime" type="time" step="900"></label>
+    </div>
+    <div class="dsum" id="dSum"></div>
+    <ul class="reasons" id="dNotes"></ul>
+    <h3 class="sub">Your drift on the good-water map</h3>
+    <div class="mapwrap"><svg id="dmap" class="rmap" viewBox="0 0 640 320" width="100%" role="img" aria-label="Your drift drawn over fishing quality by river location and time"></svg><div class="readout mapRead" id="dRead" hidden></div></div>
+    <div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:var(--ink)"></i>Your drift</span></div>
+    <p class="foot" id="dFoot"></p>
+  </section>
 
   <section class="panel verdict" aria-live="polite">
     <div class="tripctl top">
       <label>Boat<select id="tBoat"><option value="prop">Prop motor</option><option value="jet">Jet boat</option><option value="drift">Drift boat</option><option value="wade">Wading</option></select></label>
-      <label>Launch from<select id="tLaunch"><option value="dam">Buford Dam (Lower Pool)</option><option value="settles">Settles Bridge</option><option value="mcginnis">McGinnis Ferry</option><option value="abbotts">Abbotts Bridge</option><option value="medlock">Medlock Bridge</option></select></label>
+      <label>Launch from<select id="tLaunch"></select></label>
       <label id="motorLbl">Motor up<select id="tMotor"><option value="0">0 (drift only)</option><option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">1 h</option><option value="90">1.5 h</option></select></label>
       <label id="takeLbl" hidden>Take out at<select id="tTake"></select></label>
       <label id="floatLbl">Float back<select id="tFloat"><option value="0">—</option><option value="1">1 h</option><option value="2">2 h</option><option value="3">3 h</option><option value="3.5">3.5 h</option><option value="4">4 h</option><option value="4.5">4.5 h</option><option value="5">5 h</option></select></label>
@@ -179,7 +210,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
   <section class="panel">
     <h2 id="mapTitle">Where the good water is</h2>
     <p class="foot">Each row is a spot on the river, top is the dam, and each column is 15 minutes. Blue is release water moving downstream; green is good fishing water. With a fast boat, stay in the green: fish ahead of the blue band, then run back up behind it. Tap the map for details.</p>
-    <div class="mapwrap"><svg id="rmap" viewBox="0 0 640 300" width="100%" role="img" aria-label="Fishing quality by river location and time of day"></svg><div class="readout" id="mapRead" hidden></div></div>
+    <div class="mapwrap"><svg id="rmap" class="rmap" viewBox="0 0 640 320" width="100%" role="img" aria-label="Fishing quality by river location and time of day"></svg><div class="readout mapRead" id="mapRead" hidden></div></div>
     <div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:color-mix(in srgb,var(--river) 45%,var(--panel))"></i>Rising or falling</span></div>
   </section>
 
@@ -424,17 +455,16 @@ function chartHover(ev){
   if(getComputedStyle(r).position==='absolute') r.style.left=Math.max(4,Math.min(px>wrapW/2?px-rw-12:px+12, wrapW-rw-4))+'px'; else r.style.left='';
 }
 // ---- River-by-hour map: fishing quality at every spot and time ----
-let MAP=null;
-function renderMap(ctx){
-  const now=ctx.now;
-  let day=new Date(now.getFullYear(),now.getMonth(),now.getDate()); let sunT=sun(day);
-  if(+now>+sunT.set+30*60e3){ day=new Date(day.getFullYear(),day.getMonth(),day.getDate()+1); sunT=sun(day); }
+const MAPS={};
+function mapDay(now){ let day=new Date(now.getFullYear(),now.getMonth(),now.getDate()); if(+now>+sun(day).set+30*60e3) day=new Date(day.getFullYear(),day.getMonth(),day.getDate()+1); return day; }
+function renderMap(ctx,o={}){
+  const id=o.svg||'rmap', now=ctx.now, day=o.day||mapDay(now), sunT=sun(day);
   const isToday=dayKey(day)===dayKey(now);
-  $('mapTitle').textContent=`Where the good water is ${isToday?'today':day.toLocaleDateString([], {weekday:'long'})}`;
-  const W=640,Hh=300,L=104,R=8,T=8,B=22, w=W-L-R, h=Hh-T-B;
+  if(!o.svg) $('mapTitle').textContent=`Where the good water is ${isToday?'today':day.toLocaleDateString([], {weekday:'long'})}`;
+  const W=640,Hh=320,L=128,R=8,T=8,B=22, w=W-L-R, h=Hh-T-B;
   const t0=+sunT.rise-30*60e3, t1=+sunT.set+30*60e3, step=15*60e3, cols=Math.ceil((t1-t0)/step);
-  const k0=LAUNCHES[0].km, k1=LAUNCHES[LAUNCHES.length-1].km, rows=34, dk=(k1-k0)/rows;
-  const cw=w/cols, rh=h/rows, cells=[];
+  const k0=LAUNCHES[0].km, k1=END_KM, rows=50, dk=(k1-k0)/rows;
+  const cw=w/cols, rh=h/rows, cells=[], X=t=>L+(t-t0)/(t1-t0)*w, Y=km=>T+(km-k0)/(k1-k0)*h;
   let g='';
   for(let r=0;r<rows;r++){
     const km=k0+(r+0.5)*dk;
@@ -447,42 +477,108 @@ function renderMap(ctx){
       g+=`<rect x="${(L+c*cw).toFixed(1)}" y="${(T+r*rh).toFixed(1)}" width="${(cw+0.4).toFixed(1)}" height="${(rh+0.4).toFixed(1)}" fill="${fill}"/>`;
     }
   }
-  // ramps
+  const marked=o.ramps||[TRIP.launch];
   for(const lp of LAUNCHES){
-    const y=T+(lp.km-k0)/(k1-k0)*h;
-    g+=`<line x1="${L-4}" x2="${L+w}" y1="${y}" y2="${y}" stroke="var(--ink)" stroke-width="${lp.id===TRIP.launch?1.6:0.6}" opacity="${lp.id===TRIP.launch?0.9:0.35}"/>`;
-    g+=`<text x="${L-8}" y="${Math.min(Math.max(y+3.5,T+9),T+h)}" text-anchor="end" class="${lp.id===TRIP.launch?'ramp':''}">${lp.name.replace(' (Lower Pool)','')}</text>`;
+    const y=Y(lp.km), on=marked.includes(lp.id);
+    g+=`<line x1="${L-4}" x2="${L+w}" y1="${y}" y2="${y}" stroke="var(--ink)" stroke-width="${on?1.6:0.6}" opacity="${on?0.9:0.3}"/>`;
+    g+=`<text x="${L-7}" y="${Math.min(Math.max(y+3.5,T+9),T+h)}" text-anchor="end" class="${on?'ramp':''}">${lp.name.replace(' (Lower Pool)','').replace('Chattahoochee River Park','Chatt. River Park')}</text>`;
   }
-  // hour ticks
   for(let hr=new Date(t0).getHours()+1; ; hr++){
-    const t=+day+hr*H; if(t>t1) break; const x=L+(t-t0)/(t1-t0)*w;
+    const t=+day+hr*H; if(t>t1) break; const x=X(t);
     if(hr%2===0) g+=`<text x="${x}" y="${Hh-6}" text-anchor="middle">${fmtH(t)}</text>`;
     g+=`<line x1="${x}" x2="${x}" y1="${T+h}" y2="${T+h+4}" stroke="var(--muted)"/>`;
   }
-  if(isToday && +now>t0 && +now<t1){ const x=L+(+now-t0)/(t1-t0)*w;
+  if(isToday && +now>t0 && +now<t1){ const x=X(+now);
     g+=`<line x1="${x}" x2="${x}" y1="${T}" y2="${T+h}" stroke="var(--ink)" stroke-width="1.5"/><text x="${x+3}" y="${T+10}" style="fill:var(--ink);font-weight:600">now</text>`; }
-  g+=`<rect id="mapSel" width="${cw}" height="${rh}" fill="none" stroke="var(--ink)" stroke-width="1.5" style="display:none"/>`;
-  $('rmap').innerHTML=g;
-  MAP={cells,cols,rows,L,T,w,h,W,cw,rh,ctx};
+  if(o.path&&o.path.length){
+    const pts=o.path.filter(p=>p.t>=t0&&p.t<=t1).map(p=>`${X(p.t).toFixed(1)},${Y(p.km).toFixed(1)}`).join(' ');
+    const a=o.path[0], z=o.path[o.path.length-1];
+    g+=`<polyline points="${pts}" fill="none" stroke="var(--panel)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
+    g+=`<polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+    for(const [p,lab] of [[a,'Put in'],[z,'Take out']]) if(p.t>=t0&&p.t<=t1){
+      g+=`<circle cx="${X(p.t)}" cy="${Y(p.km)}" r="5" fill="var(--ink)" stroke="var(--panel)" stroke-width="2"/>`;
+      g+=`<text x="${X(p.t)+(X(p.t)>L+w-70?-8:8)}" y="${Y(p.km)+(lab==='Put in'?-7:14)}" text-anchor="${X(p.t)>L+w-70?'end':'start'}" style="fill:var(--ink);font-weight:600">${lab} ${fmtH(p.t)}</text>`;
+    }
+  }
+  g+=`<rect class="mapSel" width="${cw}" height="${rh}" fill="none" stroke="var(--ink)" stroke-width="1.5" style="display:none"/>`;
+  const svg=$(id); svg.setAttribute('viewBox',`0 0 ${W} ${Hh}`); svg.innerHTML=g;
+  MAPS[id]={cells,cols,rows,L,T,w,h,W,Hh,cw,rh,read:o.read||'mapRead'};
 }
 function mapHover(ev){
-  if(!MAP) return;
-  const box=$('rmap').getBoundingClientRect(), {L,T,w,h,W,cols,rows,cw,rh}=MAP;
-  const vx=(ev.clientX-box.left)/box.width*W, vy=(ev.clientY-box.top)/box.height*300;
-  if(vx<L||vx>L+w||vy<T||vy>T+h){ return; }
+  const id=ev.currentTarget.id, M=MAPS[id]; if(!M) return;
+  const box=ev.currentTarget.getBoundingClientRect(), {L,T,w,h,W,Hh,cols,rows,cw,rh}=M;
+  const vx=(ev.clientX-box.left)/box.width*W, vy=(ev.clientY-box.top)/box.height*Hh;
+  if(vx<L||vx>L+w||vy<T||vy>T+h) return;
   const c=Math.min(cols-1,Math.floor((vx-L)/cw)), r=Math.min(rows-1,Math.floor((vy-T)/rh));
-  const cell=MAP.cells[r*cols+c];
-  const sel=$('mapSel'); sel.setAttribute('x',L+c*cw); sel.setAttribute('y',T+r*rh); sel.style.display='';
+  const cell=M.cells[r*cols+c];
+  const sel=ev.currentTarget.querySelector('.mapSel'); sel.setAttribute('x',L+c*cw); sel.setAttribute('y',T+r*rh); sel.style.display='';
   const near=LAUNCHES.reduce((a,b)=>Math.abs(b.km-cell.km)<Math.abs(a.km-cell.km)?b:a);
   const mi=Math.abs(near.km-cell.km)/1.609, where=mi<0.4?`at ${near.name}`:`${mi.toFixed(1)} mi ${cell.km>near.km?'below':'above'} ${near.name}`;
   const label={high:'Release water: high and fast',caution:'Water rising',falling:'Falling back after a release',low:'Low, normal water'}[cell.st]||'No data';
   const s=cell.s||{};
-  $('mapRead').innerHTML=`<div class="t">${fmtT(new Date(cell.t))}, ${where}</div><div>${label}${cell.q!=null?` · score <b>${cell.q}</b>`:''}</div>`+
+  $(M.read).innerHTML=`<div class="t">${fmtT(new Date(cell.t))}, ${where}</div><div>${label}${cell.q!=null?` · score <b>${cell.q}</b>`:''}</div>`+
     (s.turb!=null?`<div>Turbidity <b>${s.turb} FNU</b> · E. coli <b>${s.ec??'–'}</b>${s.tf!=null?` · <b>${s.tf.toFixed(0)}°F</b>`:''}</div>`:'');
-  $('mapRead').hidden=false;
+  $(M.read).hidden=false;
 }
-$('rmap').addEventListener('pointermove',mapHover);
-$('rmap').addEventListener('pointerdown',mapHover);
+for(const id of ['rmap','dmap']){ $(id).addEventListener('pointermove',mapHover); $(id).addEventListener('pointerdown',mapHover); }
+// ---- Drift calculator page ----
+function simulateDrift(from,to,T,ctx){
+  const sunT=sun(new Date(T)), step=5*60e3, pts=[]; let km=from.km, t=T, sum=0, n=0, hi=0, prev=null, hit=null, dark=false, muddy=false, ecHi=false;
+  while(km<to.km && t<T+18*H){
+    const r=fishQ(t,km,ctx,sunT), s=r&&r.s;
+    pts.push({t,km});
+    if(r){ if(r.dark) dark=true; sum+=r.q; n++; }
+    if(s){ const isHi=s.water==='high'||s.water==='caution'; if(isHi) hi++; if(isHi&&prev===false&&!hit) hit={t,km}; prev=isHi;
+      if(s.turb!=null&&s.turb>=15) muddy=true; if(s.ec!=null&&s.ec>=235) ecHi=true; }
+    km+=DRIFT_KMH[s?s.water:'low']*step/H; t+=step;
+  }
+  pts.push({t,km:Math.min(km,to.km)});
+  return {pts,end:t,hours:(t-T)/H,score:n?Math.round(sum/n):null,hiShare:n?hi/n:0,hit,dark,muddy,ecHi,done:km>=to.km};
+}
+function driftPage(){
+  if(!LAST) return;
+  const ctx=buildCtx(), from=LAUNCHES.find(x=>x.id===$('dFrom').value)||LAUNCHES[0];
+  const downs=LAUNCHES.filter(x=>x.km>from.km);
+  if(!downs.length){ $('dSum').innerHTML=''; $('dNotes').innerHTML='<li><i class="dot w"></i><span>Morgan Falls is the last ramp. Pick a put-in upstream of it.</span></li>'; return; }
+  const keep=$('dTo').value; $('dTo').innerHTML=rampOptions(downs); $('dTo').value=downs.some(x=>x.id===keep)?keep:downs[0].id;
+  const to=LAUNCHES.find(x=>x.id===$('dTo').value);
+  const [y,m,d]=$('dDay').value.split('-').map(Number), [hh,mm]=($('dTime').value||'07:00').split(':').map(Number);
+  const T=+new Date(y,m-1,d,hh,mm), day=new Date(y,m-1,d);
+  const r=simulateDrift(from,to,T,ctx), mi=(to.km-from.km)/1.609;
+  const tile=(k,v,sub)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub||''}</div></div>`;
+  const sc=r.score;
+  $('dSum').innerHTML=[
+    tile('Drift time',`${Math.floor(r.hours)}h ${String(Math.round((r.hours%1)*60)).padStart(2,'0')}m`,`${mi.toFixed(1)} river miles`),
+    tile('Take out',fmtT(new Date(r.end)),to.name),
+    tile('Release water',`${Math.round(r.hiShare*100)}%`,'of the drift'),
+    tile('Drift score',sc??'–',`<i class="dot ${sc>=65?'g':sc>=50?'w':'b'}"></i>${sc>=85?'Prime':sc>=65?'Good':sc>=50?'So-so':'Poor'}`)].join('');
+  const N=[];
+  if(r.hit) N.push(['w',`Release water catches you about ${fmtT(new Date(r.hit.t))}, ${(r.hit.km/1.609).toFixed(1)} mi below the dam. Your drift speeds up and the water stains.`]);
+  if(!r.hit&&r.hiShare>=0.25) N.push(['b',`You’d be on release water for ${Math.round(r.hiShare*100)}% of the drift.`]);
+  if(r.dark) N.push(['w','The drift runs outside legal fishing hours (30 min before sunrise to 30 min after sunset).']);
+  if(r.muddy) N.push(['w','Stained water (15+ FNU) for part of the drift.']);
+  if(r.ecHi) N.push(['w','E. coli estimate over 235 for part of the drift. Limit skin contact.']);
+  if(to.id==='morganfalls') N.push(['w','The last stretch into Morgan Falls is slow reservoir water, so expect a longer drift than shown.']);
+  if(!N.length) N.push(['g','Clean drift: no release water, clear water, inside legal hours.']);
+  $('dNotes').innerHTML=N.map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
+  renderMap(ctx,{svg:'dmap',read:'dRead',day,path:r.pts,ramps:[from.id,to.id]});
+  const posted=SCHED&&SCHED.days[dayKey(day)];
+  $('dFoot').textContent=`${dayKey(day)<dayKey(ctx.now)?'Past day: uses the actual dam releases.':posted?'Uses the Corps schedule posted for this day.':'The Corps hasn’t posted this day’s schedule, so this assumes no new release. Releases ran every day of the last 60.'} Clarity, E. coli and temperature come from the Medlock gauge.`;
+}
+function driftControls(){
+  $('dFrom').innerHTML=rampOptions(LAUNCHES.slice(0,-1));
+  $('dFrom').value=TRIP.launch&&TRIP.launch!=='morganfalls'?TRIP.launch:'medlock';
+  const now=new Date(), t=new Date(Math.ceil(+now/(15*60e3))*15*60e3);
+  $('dDay').value=dayKey(now); $('dDay').min=dayKey(new Date(+now-30*86400e3)); $('dDay').max=dayKey(new Date(+now+7*86400e3));
+  $('dTime').value=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+  for(const id of ['dFrom','dTo','dDay','dTime']) $(id).addEventListener('change',driftPage);
+}
+function route(){
+  const drift=location.hash==='#drift';
+  for(const el of document.querySelectorAll('main > section')) el.hidden = el.id==='driftPage' ? !drift : drift;
+  $('tabPlan').setAttribute('aria-current',drift?'false':'page'); $('tabDrift').setAttribute('aria-current',drift?'page':'false');
+  if(drift) driftPage();
+}
 function chartLeave(){ if($('hover')) $('hover').style.display='none'; $('readout').hidden=true; }
 $('chart').addEventListener('pointermove',chartHover);
 $('chart').addEventListener('pointerdown',chartHover);
@@ -573,20 +669,29 @@ const PROFILE=[
   {km:0.7, rise:0,   peak:0.5, wade:0,   settle:0.25, ft:3.6},  // 02334430 at the dam
   {km:4.7, rise:0.5, peak:2.0, wade:2.8, settle:3.8,  ft:6.0},  // 02334500 near Buford (GA 20 area)
   {km:13.7,rise:2.0, peak:3.8, wade:6.8, settle:8.0,  ft:4.8},  // 02334653 above McGinnis Ferry
-  {km:29.7,rise:5.0, peak:8.2, wade:11.8,settle:15.0, ft:2.1}]; // 02335000 Medlock
+  {km:29.7,rise:5.0, peak:8.2, wade:11.8,settle:15.0, ft:2.1},  // 02335000 Medlock
+  {km:46.0,rise:9.2, peak:12.0,wade:13.9,settle:17.0, ft:0.9},  // 02335450 above Roswell
+  {km:58.3,rise:12.4,peak:14.9,wade:15.5,settle:18.5, ft:0.7}]; // Morgan Falls: extrapolated, no clean gauge (reservoir pool)
 function prof(km){
   const P=PROFILE; if(km<=P[0].km) return {...P[0]}; if(km>=P[P.length-1].km) return {...P[P.length-1]};
   const i=P.findIndex(p=>p.km>=km), a=P[i-1], b=P[i], f=(km-a.km)/(b.km-a.km), o={km};
   for(const k of ['rise','peak','wade','settle','ft']) o[k]=a[k]+(b[k]-a[k])*f;
   return o;
 }
+// River km below the dam, measured along the USGS NHDPlus flowline
 const LAUNCHES=[
   {id:'dam',name:'Buford Dam (Lower Pool)',km:0.7},
   {id:'settles',name:'Settles Bridge',km:10.3},
-  {id:'mcginnis',name:'McGinnis Ferry',km:15.6},
+  {id:'mcginnis',name:'McGinnis Ferry',km:16.6},
+  {id:'rogers',name:'Rogers Bridge',km:19.8},
   {id:'abbotts',name:'Abbotts Bridge',km:22.4},
   {id:'medlock',name:'Medlock Bridge',km:29.7},
-  {id:'jones',name:'Jones Bridge',km:34.5,takeoutOnly:true}];
+  {id:'jones',name:'Jones Bridge',km:34.8},
+  {id:'holcomb',name:'Holcomb Bridge',km:38.5},
+  {id:'islandford',name:'Island Ford',km:47.9},
+  {id:'crpark',name:'Chattahoochee River Park',km:53.1},
+  {id:'morganfalls',name:'Morgan Falls',km:58.3}];
+const END_KM=LAUNCHES[LAUNCHES.length-1].km;
 // Drift-only trips (no motor) end at the next ramp downstream
 const nextRamp=L=>LAUNCHES[LAUNCHES.indexOf(L)+1];
 // Drift speed with fishing stops, km/h: about 1.3 mph at low water, faster as release water arrives
@@ -600,7 +705,7 @@ function stateAt(km,t,ctx){
   // Water at river km `km` at time t: {water, turb, ec, tf}
   const {S,base,now,rel}=ctx, p=prof(km); let water='low';
   const st=S[SITES.med+':00065']||[];
-  if(km>=MED_KM-0.5 && t<=+now){
+  if(Math.abs(km-MED_KM)<0.5 && t<=+now){
     const v=valAt(st,t); if(v==null) return null;
     water = v<=base+0.5?'low': v<=base+0.8?'falling':'high';
   } else {
@@ -639,7 +744,7 @@ function tripPath(T){
   const L=launch(), mot=TRIP.motor*60e3, fl=TRIP.float*H;
   const reach=TRIP.motor/60*motorKmh();
   if(L.id==='dam'){
-    const far=Math.min(L.km+reach, MED_KM);
+    const far=Math.min(L.km+reach, END_KM);
     return {floatFirst:true, fStart:T, fEnd:T+fl, mStart:T+fl, end:T+fl+mot,
       floatKm:f=>L.km+(far-L.km)*f, motorKm:f=>far-(far-L.km)*f, turn:far};
   }
@@ -658,7 +763,7 @@ function fishQ(t,km,ctx,sunT){
   return {q:Math.max(0,Math.min(100,q)),s};
 }
 // Takeout for one-way drifts: the chosen ramp if it is downstream of the launch, else the next one
-function takeout(L){const t=LAUNCHES.find(x=>x.id===TRIP.take); return t&&t.km>L.km?t:nextRamp(L)}
+function takeout(L){const t=LAUNCHES.find(x=>x.id===TRIP.take); return t&&t.km>L.km?t:(nextRamp(L)||L)}
 // Wading: stay at the ramp for TRIP.float hours. Release water at the ramp is unsafe, so it scores zero.
 function wadeScore(T,ctx,sunT){
   const L=launch(), dur=(TRIP.float||3)*H, step=15*60e3; let sum=0,n=0,prev=null;
@@ -697,7 +802,8 @@ function driftScore(T,ctx,sunT){
 function tripScore(T,ctx,sunT){
   if(T<+sunT.rise-30*60e3||T>+sunT.set+30*60e3) return {score:null,dark:true};
   if(TRIP.boat==='wade') return wadeScore(T,ctx,sunT);
-  if(TRIP.boat==='drift'||TRIP.motor===0) return driftScore(T,ctx,sunT);
+  if((TRIP.boat==='drift'||TRIP.motor===0) && nextRamp(launch())) return driftScore(T,ctx,sunT);
+  if(!nextRamp(launch()) && (TRIP.boat==='drift'||TRIP.motor===0)) return {score:null};
   const P=tripPath(T), mot=TRIP.motor*60e3, fl=TRIP.float*H, step=15*60e3;
   let pen=0, flags={motorHigh:false,motorRising:false,releaseHit:null,afterDark:false,muddy:false,upstream:!P.floatFirst};
   for(let t=P.mStart;t<P.mStart+mot;t+=step){
@@ -817,6 +923,7 @@ function renderWindows(){
   if(!SCHED||!SCHED.days[dayKey(tom)]) html+=`<div class="day"><div class="d">${tom.toLocaleDateString([], {weekday:'short'})}<small>${tom.toLocaleDateString([], {month:'short',day:'numeric'})}</small></div><div class="meta">The Corps hasn’t posted this schedule yet. Releases ran every day of the last 60, most starting 4–7 PM.</div></div>`;
   $('ahead').innerHTML=html;
   renderMap(ctx);
+  route();
   $('schedNote').innerHTML=(SCHED?`Corps schedule checked ${new Date(SCHED.updated).toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})}. `:'<span class="err">Couldn’t load the Corps schedule file.</span> Using live dam readings only; check the recording at (770) 945-1466. ')+
     `Each bar block is a launch time from ${launch().name} scored for your whole trip: ${tripDesc()}. Future hours assume today’s clarity, E. coli, and temperature hold. The Corps can change releases without notice.`;
 
@@ -845,7 +952,9 @@ function tripDesc(){
   if(L.id==='dam') return `${TRIP.float} h float down, ${TRIP.motor} min motor back at about ${mph} mph`;
   return `${TRIP.motor} min up (about ${Math.min(TRIP.motor/60*mph,(L.km-LAUNCHES[0].km)/1.609).toFixed(0)} mi at ${mph} mph), ${TRIP.float} h float back`;
 }
+function rampOptions(list){return list.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
 function tripControls(){
+  $('tLaunch').innerHTML=rampOptions(LAUNCHES);
   const ids=['tBoat','tLaunch','tMotor','tTake','tFloat'];
   const fillTake=()=>{ const L=launch(); $('tTake').innerHTML=LAUNCHES.filter(x=>x.km>L.km).map(x=>`<option value="${x.id}">${x.name}</option>`).join(''); $('tTake').value=takeout(L).id; };
   const sync=()=>{
@@ -861,7 +970,7 @@ function tripControls(){
     if(boat==='wade') return {motor:0,float:3};
     if(boat==='drift') return {motor:0,float:0};
     if(boat==='jet') return {motor:20,float:4};
-    return launchId==='medlock'?{motor:45,float:4}:{motor:0,float:0};
+    return (launchId==='medlock'||launchId==='morganfalls')?{motor:45,float:4}:{motor:0,float:0};
   };
   if(!TRIP.boat) TRIP.boat='prop';
   $('tBoat').value=TRIP.boat; $('tLaunch').value=TRIP.launch; $('tMotor').value=TRIP.motor; $('tFloat').value=TRIP.float; sync();
@@ -877,6 +986,9 @@ function tripControls(){
   });
 }
 tripControls();
+driftControls();
+route();
+window.addEventListener('hashchange',()=>{route();window.scrollTo(0,0)});
 $('refresh').addEventListener('click',()=>{loadSchedule().then(renderWindows);load(true)});
 loadSchedule().then(renderWindows);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden) load()});

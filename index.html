@@ -35,9 +35,11 @@
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));
   padding-block:calc(env(safe-area-inset-top,0px) + 12px) calc(env(safe-area-inset-bottom,0px) + 32px)}
-main{max-width:680px;margin:0 auto;display:grid;gap:14px}
+main{max-width:680px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+main>*{min-width:0}
+.panel{overflow-wrap:anywhere}
 header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
 h1{font:700 30px/1 var(--f-display);letter-spacing:.01em;margin:0;text-transform:uppercase}
 h1 small{display:block;font:500 13px/1.3 var(--f-body);letter-spacing:0;text-transform:none;color:var(--muted);margin-top:4px}
@@ -70,10 +72,25 @@ ul.reasons li{display:flex;gap:8px;align-items:flex-start}
 .timeline .now time{color:var(--river)}
 .status{font-weight:600}
 .chartwrap{position:relative}
+.phead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.phead h2,.phead h3{margin-bottom:10px}
+.xbtn{padding:5px 11px;font-size:12px}
+.zoom{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column}
+.zoombar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 8px) max(14px,env(safe-area-inset-right,0px)) 8px max(14px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line);background:var(--panel)}
+.zoombar b{font:700 16px var(--f-display);text-transform:uppercase;letter-spacing:.05em;min-width:0}
+.zbtns{display:flex;gap:8px;flex:none}
+.zoombody{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px max(10px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 16px) max(10px,env(safe-area-inset-left,0px))}
+.zoombody svg{display:block;width:100%;height:auto}
+.zoombody .readout{position:static;display:block;margin-top:8px;box-shadow:none;white-space:normal}
+/* Landscape view while the phone is held upright: turn the whole viewer sideways */
+.zoom.rot{inset:auto;top:0;left:100vw;width:100vh;height:100vw;width:100dvh;height:100dvw;transform:rotate(90deg);transform-origin:top left}
+@media (orientation:landscape){#zoomRotate{display:none}}
+body.zoomed{overflow:hidden}
 .mapwrap{position:relative;margin-top:6px}
 .rmap{display:block;touch-action:pan-y;cursor:crosshair}
 .rmap text{fill:var(--muted);font:10.5px var(--f-body)}
 .rmap .ramp{fill:var(--ink);font-weight:600}
+.rmap.tall text{font-size:13px}
 .hdr-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .tabs{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
 .tabs a{font:600 13px var(--f-body);color:var(--muted);text-decoration:none;padding:7px 12px}
@@ -116,7 +133,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 .day .d{font:700 16px/1.2 var(--f-display);text-transform:uppercase;letter-spacing:.03em}
 .day .d small{display:block;font:400 11px var(--f-body);text-transform:none;letter-spacing:0;color:var(--muted)}
 .wins{display:flex;flex-wrap:wrap;gap:6px}
-.win{font:600 12.5px var(--f-mono);font-variant-numeric:tabular-nums;padding:3px 9px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.win{font:600 12.5px var(--f-mono);font-variant-numeric:tabular-nums;padding:3px 9px;border-radius:999px;border:1px solid var(--line);white-space:normal}
 .win.prime{background:var(--good);border-color:var(--good);color:var(--panel)}
 .win.good{border-color:var(--good);color:var(--good)}
 .win.none{color:var(--muted);font-family:var(--f-body);font-weight:500}
@@ -136,6 +153,8 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 .schedlist{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:6px}
 .schedlist li{display:flex;justify-content:space-between;align-items:center;gap:8px;font-family:var(--f-mono);font-size:13px}
 .tripctl{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.tripctl label{min-width:0;max-width:100%}
+.tripctl select,.tripctl input{max-width:100%;min-width:0}
 .rampinfo{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted);display:grid;gap:4px}
 .rampinfo:empty{display:none}
 .badge{display:inline-block;font:600 11px var(--f-body);letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;margin-right:6px;vertical-align:1px}
@@ -186,7 +205,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
     <p class="rampinfo" id="dRampInfo"></p>
     <div class="dsum" id="dSum"></div>
     <ul class="reasons" id="dNotes"></ul>
-    <h3 class="sub">Your drift on the good-water map</h3>
+    <div class="phead"><h3 class="sub">Your drift on the good-water map</h3><button type="button" class="xbtn" data-zoom="dmap" aria-label="Enlarge the drift map">⤢ Enlarge</button></div>
     <div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:var(--ink)"></i>Your drift</span></div>
     <div class="mapwrap"><svg id="dmap" class="rmap" viewBox="0 0 640 440" width="100%" role="img" aria-label="Your drift drawn over fishing quality by river location and time"></svg><div class="readout mapRead" id="dRead" hidden></div></div>
     <p class="foot" id="dFoot"></p>
@@ -222,14 +241,14 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 
 
   <section class="panel">
-    <h2 id="mapTitle">Where the good water is</h2>
+    <div class="phead"><h2 id="mapTitle">Where the good water is</h2><button type="button" class="xbtn" data-zoom="rmap" aria-label="Enlarge the good-water map">⤢ Enlarge</button></div>
     <p class="foot">Each row is a spot on the river, top is the dam, and each column is 15 minutes. Blue is release water moving downstream; green is good fishing water. With a fast boat, stay in the green: fish ahead of the blue band, then run back up behind it. Below Morgan Falls Dam, past hours use the Atlanta gauge’s readings and future hours follow Georgia Power’s Morgan Falls turbine schedule (2+ units shows as release water, 1 unit as partly raised). Tap the map for details.</p>
     <div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:color-mix(in srgb,var(--river) 45%,var(--panel))"></i>Rising or falling</span></div>
     <div class="mapwrap"><svg id="rmap" class="rmap" viewBox="0 0 640 440" width="100%" role="img" aria-label="Fishing quality by river location and time of day"></svg><div class="readout mapRead" id="mapRead" hidden></div></div>
   </section>
 
   <section class="panel">
-    <h2>Last 48 hours</h2>
+    <div class="phead"><h2>Last 48 hours</h2><button type="button" class="xbtn" data-zoom="chart" aria-label="Enlarge the 48-hour chart">⤢ Enlarge</button></div>
     <div class="chartwrap"><svg id="chart" viewBox="0 0 640 230" width="100%" role="img" aria-label="River stage at Medlock and dam outflow, last 48 hours"></svg><div class="readout" id="readout" hidden></div></div>
     <div class="legend"><span><i style="background:var(--river)"></i>Medlock stage (ft)</span><span><i style="background:var(--dam)"></i>Dam outflow (cfs)</span><span><i style="background:var(--turb)"></i>Turbidity (FNU)</span><span><i style="background:var(--ecoli)"></i>E. coli (line = 235 limit)</span></div>
   </section>
@@ -255,6 +274,10 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
     <div id="log"></div>
   </section>
 </main>
+<div class="zoom" id="zoom" hidden role="dialog" aria-modal="true" aria-labelledby="zoomTitle">
+  <div class="zoombar"><b id="zoomTitle"></b><span class="zbtns"><button type="button" id="zoomRotate">⟳ Landscape</button><button type="button" id="zoomClose">✕ Close</button></span></div>
+  <div class="zoombody" id="zoomBody"></div>
+</div>
 
 <script>
 const LAT=33.998, LON=-84.200;
@@ -476,13 +499,13 @@ function renderMap(ctx,o={}){
   const id=o.svg||'rmap', now=ctx.now, day=o.day||mapDay(now), sunT=sun(day);
   const isToday=dayKey(day)===dayKey(now);
   if(!o.svg) $('mapTitle').textContent=`Where the good water is ${isToday?'today':day.toLocaleDateString([], {weekday:'long'})}`;
-  const W=640,Hh=440,L=104,R=8,T=8,B=22, w=W-L-R, h=Hh-T-B;
+  const W=640,Hh=o.tall?1800:440,L=o.tall?124:104,R=8,T=o.tall?24:8,B=22, w=W-L-R, h=Hh-T-B;
   const t0=+sunT.rise-30*60e3, t1=+sunT.set+30*60e3, step=15*60e3, cols=Math.ceil((t1-t0)/step);
   // Two bands: the upper river (dam to Overlook Park) and, below Morgan Falls Dam, the lower river.
   // The lower band gets more height per mile so its closely spaced ramps stay readable.
   const k0=LAUNCHES[0].km, kU=58.3, kL=59.4, k1=END_KM, gap=18, hU=Math.round((h-gap)*0.64), hL=h-gap-hU;
   const Y=km=>km<=kU+0.3 ? T+(Math.min(km,kU)-k0)/(kU-k0)*hU : T+hU+gap+(Math.max(km,kL)-kL)/(k1-kL)*hL;
-  const rowsU=56, rowsL=28, rows=rowsU+rowsL, rhU=hU/rowsU, rhL=hL/rowsL;
+  const rowsU=o.tall?112:56, rowsL=o.tall?56:28, rows=rowsU+rowsL, rhU=hU/rowsU, rhL=hL/rowsL;
   const rowY=r=>r<rowsU?T+r*rhU:T+hU+gap+(r-rowsU)*rhL, rowH=r=>r<rowsU?rhU:rhL;
   const rowKm=r=>r<rowsU?k0+(r+0.5)*(kU-k0)/rowsU:kL+(r-rowsU+0.5)*(k1-kL)/rowsL;
   const cw=w/cols, rh=rhU, cells=[], X=t=>L+(t-t0)/(t1-t0)*w;
@@ -510,7 +533,7 @@ function renderMap(ctx,o={}){
     const y1=Y(DH.from), y2=Y(DH.to); g+=`<rect x="${L+w-5}" y="${y1}" width="5" height="${y2-y1}" fill="#f2c14e"/><text x="${L+w-9}" y="${y1+11}" text-anchor="end" style="fill:var(--ink);font-weight:600">Delayed harvest</text>`; }
   for(let hr=new Date(t0).getHours()+1; ; hr++){
     const t=+day+hr*H; if(t>t1) break; const x=X(t);
-    if(hr%2===0) g+=`<text x="${x}" y="${Hh-6}" text-anchor="middle">${fmtH(t)}</text>`;
+    if(hr%2===0){ g+=`<text x="${x}" y="${Hh-6}" text-anchor="middle">${fmtH(t)}</text>`; if(o.tall) g+=`<text x="${x}" y="${T-8}" text-anchor="middle">${fmtH(t)}</text>`; }
     g+=`<line x1="${x}" x2="${x}" y1="${T+h}" y2="${T+h+4}" stroke="var(--muted)"/>`;
   }
   if(isToday && +now>t0 && +now<t1){ const x=X(+now);
@@ -531,7 +554,7 @@ function renderMap(ctx,o={}){
     }
   }
   g+=`<rect class="mapSel" width="${cw}" height="${rh}" fill="none" stroke="var(--ink)" stroke-width="1.5" style="display:none"/>`;
-  const svg=$(id); svg.setAttribute('viewBox',`0 0 ${W} ${Hh}`); svg.innerHTML=g;
+  const svg=$(id); svg.setAttribute('viewBox',`0 0 ${W} ${Hh}`); svg.innerHTML=g; svg.classList.toggle('tall',!!o.tall);
   MAPS[id]={cells,cols,rows,L,T,w,h,W,Hh,cw,rowY,rowH,read:o.read||'mapRead'};
 }
 function mapHover(ev){
@@ -593,7 +616,8 @@ function driftPage(){
   if(to.id==='overlook') N.push(['w','The last stretch into Morgan Falls is slow reservoir water, so expect a longer drift than shown.']);
   if(!N.length) N.push(['g','Clean drift: no release water, clear water, inside legal hours.']);
   $('dNotes').innerHTML=N.map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
-  renderMap(ctx,{svg:'dmap',read:'dRead',day,path:r.pts,ramps:[from.id,to.id]});
+  DRIFT_LAST={day,path:r.pts,ramps:[from.id,to.id]};
+  renderMap(ctx,{svg:'dmap',read:'dRead',...DRIFT_LAST});
   const posted=SCHED&&SCHED.days[dayKey(day)];
   $('dFoot').textContent=`${dayKey(day)<dayKey(ctx.now)?'Past day: uses the actual dam releases.':posted?'Uses the Corps schedule posted for this day.':'The Corps hasn’t posted this day’s schedule, so this assumes no new release. Releases ran every day of the last 60.'} Clarity, E. coli and temperature come from the Medlock gauge.`;
 }
@@ -611,6 +635,34 @@ function route(){
   $('tabPlan').setAttribute('aria-current',drift?'false':'page'); $('tabDrift').setAttribute('aria-current',drift?'page':'false');
   if(drift) driftPage();
 }
+// ---- Enlarged chart viewer ----
+let ZOOM=null;
+function openZoom(kind,rot){
+  ZOOM={kind,rot:!!rot};
+  const z=$('zoom'), body=$('zoomBody');
+  z.classList.toggle('rot',ZOOM.rot); $('zoomRotate').textContent=ZOOM.rot?'⟳ Portrait':'⟳ Landscape';
+  if(kind==='chart'){
+    $('zoomTitle').textContent='Last 48 hours';
+    const c=$('chart').cloneNode(true); c.id='zchart'; c.querySelector('#hover')?.remove();
+    body.innerHTML=''; body.appendChild(c); body.insertAdjacentHTML('beforeend',document.querySelector('#chart').closest('section').querySelector('.legend').outerHTML);
+  } else {
+    const drift=kind==='dmap';
+    $('zoomTitle').textContent=drift?'Your drift':$('mapTitle').textContent;
+    body.innerHTML=`${document.querySelector('#'+kind).closest('section').querySelector('.legend2').outerHTML}<svg id="zmap" class="rmap" width="100%" role="img" aria-label="Enlarged good-water map"></svg><div class="readout mapRead" id="zRead" hidden></div>`;
+    const ctx=buildCtx(), o={svg:'zmap',read:'zRead',tall:!ZOOM.rot};
+    if(drift&&DRIFT_LAST) Object.assign(o,DRIFT_LAST);
+    renderMap(ctx,o);
+    $('zmap').addEventListener('pointermove',mapHover); $('zmap').addEventListener('pointerdown',mapHover);
+  }
+  z.hidden=false; document.body.classList.add('zoomed'); body.scrollTop=0; body.scrollLeft=0;
+}
+function closeZoom(){ $('zoom').hidden=true; $('zoom').classList.remove('rot'); document.body.classList.remove('zoomed'); ZOOM=null; }
+document.addEventListener('click',e=>{const b=e.target.closest('[data-zoom]'); if(b) openZoom(b.dataset.zoom,false)});
+$('zoomClose').addEventListener('click',closeZoom);
+$('zoomRotate').addEventListener('click',()=>openZoom(ZOOM.kind,!ZOOM.rot));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ZOOM) closeZoom()});
+// If the phone itself is turned sideways, the viewer doesn't need to rotate too
+try{matchMedia('(orientation: landscape)').addEventListener('change',e=>{ if(ZOOM&&ZOOM.rot&&e.matches) openZoom(ZOOM.kind,false); else if(ZOOM&&ZOOM.kind!=='chart') openZoom(ZOOM.kind,ZOOM.rot); })}catch(e){}
 function chartLeave(){ if($('hover')) $('hover').style.display='none'; $('readout').hidden=true; }
 $('chart').addEventListener('pointermove',chartHover);
 $('chart').addEventListener('pointerdown',chartHover);
@@ -669,7 +721,7 @@ function renderSeason(now){
 }
 
 // ---------- Fishing windows ----------
-let LAST=null, SCHED=null, MF=null;
+let LAST=null, SCHED=null, MF=null, DRIFT_LAST=null;
 const SLOT=30*60e3;
 // Release effect at Medlock (measured, 36 clean releases): too high to wade from on+5h until off+12h; settled by off+15h
 const M={caution:4.5, high:5, wadeAfterOff:12, settleAfterOff:15, mwRelease:20};

@@ -67,6 +67,11 @@ ul.reasons li{display:flex;gap:8px;align-items:flex-start}
 .timeline .now time{color:var(--river)}
 .status{font-weight:600}
 .chartwrap{position:relative}
+.mapwrap{position:relative;margin-top:6px}
+#rmap{display:block;touch-action:pan-y;cursor:crosshair}
+#rmap text{fill:var(--muted);font:10.5px var(--f-body)}
+#rmap .ramp{fill:var(--ink);font-weight:600}
+#mapRead{position:static;display:block;margin-top:6px;box-shadow:none;white-space:normal}
 #chart{touch-action:pan-y;cursor:crosshair;display:block}
 .readout{position:absolute;top:6px;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.45;box-shadow:0 2px 8px color-mix(in srgb,var(--ink) 15%,transparent);white-space:nowrap;font-variant-numeric:tabular-nums}
 .readout b{font-weight:600}
@@ -170,6 +175,13 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
     <p class="foot" id="schedNote"></p>
   </section>
 
+
+  <section class="panel">
+    <h2 id="mapTitle">Where the good water is</h2>
+    <p class="foot">Each row is a spot on the river, top is the dam, and each column is 15 minutes. Blue is release water moving downstream; green is good fishing water. With a fast boat, stay in the green: fish ahead of the blue band, then run back up behind it. Tap the map for details.</p>
+    <div class="mapwrap"><svg id="rmap" viewBox="0 0 640 300" width="100%" role="img" aria-label="Fishing quality by river location and time of day"></svg><div class="readout" id="mapRead" hidden></div></div>
+    <div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:color-mix(in srgb,var(--river) 45%,var(--panel))"></i>Rising or falling</span></div>
+  </section>
 
   <section class="panel">
     <h2>Last 48 hours</h2>
@@ -411,6 +423,66 @@ function chartHover(ev){
   const px=(vx/W)*box.width, rw=r.offsetWidth, wrapW=svg.parentElement.clientWidth;
   if(getComputedStyle(r).position==='absolute') r.style.left=Math.max(4,Math.min(px>wrapW/2?px-rw-12:px+12, wrapW-rw-4))+'px'; else r.style.left='';
 }
+// ---- River-by-hour map: fishing quality at every spot and time ----
+let MAP=null;
+function renderMap(ctx){
+  const now=ctx.now;
+  let day=new Date(now.getFullYear(),now.getMonth(),now.getDate()); let sunT=sun(day);
+  if(+now>+sunT.set+30*60e3){ day=new Date(day.getFullYear(),day.getMonth(),day.getDate()+1); sunT=sun(day); }
+  const isToday=dayKey(day)===dayKey(now);
+  $('mapTitle').textContent=`Where the good water is ${isToday?'today':day.toLocaleDateString([], {weekday:'long'})}`;
+  const W=640,Hh=300,L=104,R=8,T=8,B=22, w=W-L-R, h=Hh-T-B;
+  const t0=+sunT.rise-30*60e3, t1=+sunT.set+30*60e3, step=15*60e3, cols=Math.ceil((t1-t0)/step);
+  const k0=LAUNCHES[0].km, k1=LAUNCHES[LAUNCHES.length-1].km, rows=34, dk=(k1-k0)/rows;
+  const cw=w/cols, rh=h/rows, cells=[];
+  let g='';
+  for(let r=0;r<rows;r++){
+    const km=k0+(r+0.5)*dk;
+    for(let c=0;c<cols;c++){
+      const t=t0+(c+0.5)*step, f=fishQ(t,km,ctx,sunT);
+      let fill='var(--line)', st=null, q=null;
+      if(f&&f.s){ st=f.s.water; q=f.q;
+        fill= st==='high'?'var(--river)': (st==='caution'||st==='falling')?'color-mix(in srgb,var(--river) 45%,var(--panel))': heat(q); }
+      cells.push({r,c,km,t,st,q,s:f&&f.s});
+      g+=`<rect x="${(L+c*cw).toFixed(1)}" y="${(T+r*rh).toFixed(1)}" width="${(cw+0.4).toFixed(1)}" height="${(rh+0.4).toFixed(1)}" fill="${fill}"/>`;
+    }
+  }
+  // ramps
+  for(const lp of LAUNCHES){
+    const y=T+(lp.km-k0)/(k1-k0)*h;
+    g+=`<line x1="${L-4}" x2="${L+w}" y1="${y}" y2="${y}" stroke="var(--ink)" stroke-width="${lp.id===TRIP.launch?1.6:0.6}" opacity="${lp.id===TRIP.launch?0.9:0.35}"/>`;
+    g+=`<text x="${L-8}" y="${Math.min(Math.max(y+3.5,T+9),T+h)}" text-anchor="end" class="${lp.id===TRIP.launch?'ramp':''}">${lp.name.replace(' (Lower Pool)','')}</text>`;
+  }
+  // hour ticks
+  for(let hr=new Date(t0).getHours()+1; ; hr++){
+    const t=+day+hr*H; if(t>t1) break; const x=L+(t-t0)/(t1-t0)*w;
+    if(hr%2===0) g+=`<text x="${x}" y="${Hh-6}" text-anchor="middle">${fmtH(t)}</text>`;
+    g+=`<line x1="${x}" x2="${x}" y1="${T+h}" y2="${T+h+4}" stroke="var(--muted)"/>`;
+  }
+  if(isToday && +now>t0 && +now<t1){ const x=L+(+now-t0)/(t1-t0)*w;
+    g+=`<line x1="${x}" x2="${x}" y1="${T}" y2="${T+h}" stroke="var(--ink)" stroke-width="1.5"/><text x="${x+3}" y="${T+10}" style="fill:var(--ink);font-weight:600">now</text>`; }
+  g+=`<rect id="mapSel" width="${cw}" height="${rh}" fill="none" stroke="var(--ink)" stroke-width="1.5" style="display:none"/>`;
+  $('rmap').innerHTML=g;
+  MAP={cells,cols,rows,L,T,w,h,W,cw,rh,ctx};
+}
+function mapHover(ev){
+  if(!MAP) return;
+  const box=$('rmap').getBoundingClientRect(), {L,T,w,h,W,cols,rows,cw,rh}=MAP;
+  const vx=(ev.clientX-box.left)/box.width*W, vy=(ev.clientY-box.top)/box.height*300;
+  if(vx<L||vx>L+w||vy<T||vy>T+h){ return; }
+  const c=Math.min(cols-1,Math.floor((vx-L)/cw)), r=Math.min(rows-1,Math.floor((vy-T)/rh));
+  const cell=MAP.cells[r*cols+c];
+  const sel=$('mapSel'); sel.setAttribute('x',L+c*cw); sel.setAttribute('y',T+r*rh); sel.style.display='';
+  const near=LAUNCHES.reduce((a,b)=>Math.abs(b.km-cell.km)<Math.abs(a.km-cell.km)?b:a);
+  const mi=Math.abs(near.km-cell.km)/1.609, where=mi<0.4?`at ${near.name}`:`${mi.toFixed(1)} mi ${cell.km>near.km?'below':'above'} ${near.name}`;
+  const label={high:'Release water: high and fast',caution:'Water rising',falling:'Falling back after a release',low:'Low, normal water'}[cell.st]||'No data';
+  const s=cell.s||{};
+  $('mapRead').innerHTML=`<div class="t">${fmtT(new Date(cell.t))}, ${where}</div><div>${label}${cell.q!=null?` · score <b>${cell.q}</b>`:''}</div>`+
+    (s.turb!=null?`<div>Turbidity <b>${s.turb} FNU</b> · E. coli <b>${s.ec??'–'}</b>${s.tf!=null?` · <b>${s.tf.toFixed(0)}°F</b>`:''}</div>`:'');
+  $('mapRead').hidden=false;
+}
+$('rmap').addEventListener('pointermove',mapHover);
+$('rmap').addEventListener('pointerdown',mapHover);
 function chartLeave(){ if($('hover')) $('hover').style.display='none'; $('readout').hidden=true; }
 $('chart').addEventListener('pointermove',chartHover);
 $('chart').addEventListener('pointerdown',chartHover);
@@ -744,6 +816,7 @@ function renderWindows(){
   const tom=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
   if(!SCHED||!SCHED.days[dayKey(tom)]) html+=`<div class="day"><div class="d">${tom.toLocaleDateString([], {weekday:'short'})}<small>${tom.toLocaleDateString([], {month:'short',day:'numeric'})}</small></div><div class="meta">The Corps hasn’t posted this schedule yet. Releases ran every day of the last 60, most starting 4–7 PM.</div></div>`;
   $('ahead').innerHTML=html;
+  renderMap(ctx);
   $('schedNote').innerHTML=(SCHED?`Corps schedule checked ${new Date(SCHED.updated).toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})}. `:'<span class="err">Couldn’t load the Corps schedule file.</span> Using live dam readings only; check the recording at (770) 945-1466. ')+
     `Each bar block is a launch time from ${launch().name} scored for your whole trip: ${tripDesc()}. Future hours assume today’s clarity, E. coli, and temperature hold. The Corps can change releases without notice.`;
 

@@ -65,12 +65,20 @@ ul.reasons li{display:flex;gap:8px;align-items:flex-start}
 .timeline .past{color:var(--muted)}
 .timeline .now time{color:var(--river)}
 .status{font-weight:600}
-.chartwrap{overflow-x:auto;position:relative}
+.chartwrap{position:relative}
 #chart{touch-action:pan-y;cursor:crosshair;display:block}
 .readout{position:absolute;top:6px;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.45;box-shadow:0 2px 8px color-mix(in srgb,var(--ink) 15%,transparent);white-space:nowrap;font-variant-numeric:tabular-nums}
 .readout b{font-weight:600}
 .readout .t{font-weight:600;margin-bottom:2px}
 .readout i{display:inline-block;width:9px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+@media (max-width:559px){
+  /* Phones: the chart is too small for a floating box, so the readout becomes a strip under the chart */
+  .readout{position:static;display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;margin-top:6px;box-shadow:none;white-space:normal;font-size:12.5px}
+  .readout[hidden]{display:none}
+  .readout .t{grid-column:1/-1}
+  .readout b{white-space:nowrap}
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px}
+}
 svg text{fill:var(--muted);font:11px var(--f-body)}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
 .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
@@ -162,7 +170,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
   <section class="panel">
     <h2>Last 48 hours</h2>
     <div class="chartwrap"><svg id="chart" viewBox="0 0 640 230" width="100%" role="img" aria-label="River stage at Medlock and dam outflow, last 48 hours"></svg><div class="readout" id="readout" hidden></div></div>
-    <div class="legend"><span><i style="background:var(--river)"></i>Medlock stage (ft)</span><span><i style="background:var(--dam)"></i>Dam outflow (cfs)</span><span><i style="background:var(--turb)"></i>Turbidity (FNU)</span><span><i style="background:var(--ecoli)"></i>E. coli est. (/100 mL), thin line = 235 limit</span></div>
+    <div class="legend"><span><i style="background:var(--river)"></i>Medlock stage (ft)</span><span><i style="background:var(--dam)"></i>Dam outflow (cfs)</span><span><i style="background:var(--turb)"></i>Turbidity (FNU)</span><span><i style="background:var(--ecoli)"></i>E. coli (line = 235 limit)</span></div>
   </section>
 
   <section class="panel season">
@@ -389,15 +397,15 @@ function chartHover(ev){
   if(st){$('hDot').setAttribute('cx',vx);$('hDot').setAttribute('cy',ys(st.v))}
   const d=new Date(t);
   const rows=[
-    ['--river','Medlock stage',st?st.v.toFixed(2)+' ft':'–'],
-    ['--dam','Dam outflow',dq?Math.round(dq.v).toLocaleString()+' cfs':'–'],
+    ['--river','Stage',st?st.v.toFixed(2)+' ft':'–'],
+    ['--dam','Dam',dq?Math.round(dq.v).toLocaleString()+' cfs':'–'],
     ['--turb','Turbidity',tu?tu.v+' FNU':'–'],
-    ['--ecoli','E. coli est.',ec?ec.v+(ec.v>=235?' ⚠':'')+' /100 mL':'–']];
+    ['--ecoli','E. coli',ec?ec.v+(ec.v>=235?' ⚠':'')+' /100 mL':'–']];
   const r=$('readout');
   r.innerHTML=`<div class="t">${d.toLocaleDateString([], {weekday:'short'})} ${d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</div>`+rows.map(([c,k,v])=>`<div><i style="background:var(${c})"></i>${k} <b>${v}</b></div>`).join('');
   r.hidden=false;
   const px=(vx/W)*box.width, rw=r.offsetWidth, wrapW=svg.parentElement.clientWidth;
-  r.style.left=Math.max(4,Math.min(px>wrapW/2?px-rw-12:px+12, wrapW-rw-4))+'px';
+  if(getComputedStyle(r).position==='absolute') r.style.left=Math.max(4,Math.min(px>wrapW/2?px-rw-12:px+12, wrapW-rw-4))+'px'; else r.style.left='';
 }
 function chartLeave(){ if($('hover')) $('hover').style.display='none'; $('readout').hidden=true; }
 $('chart').addEventListener('pointermove',chartHover);

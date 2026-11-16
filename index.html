@@ -75,6 +75,9 @@ ul.reasons li{display:flex;gap:8px;align-items:flex-start}
 .phead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .phead h2,.phead h3{margin-bottom:10px}
 .xbtn{padding:5px 11px;font-size:12px}
+.maptools{display:flex;align-items:flex-end;justify-content:space-between;gap:8px 12px;flex-wrap:wrap;margin-top:8px}
+.maptools .legend2{margin:0}
+.maptools .xbtn{flex:none}
 .zoom{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column}
 .zoombar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 8px) max(14px,env(safe-area-inset-right,0px)) 8px max(14px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line);background:var(--panel)}
 .zoombar b{font:700 16px var(--f-display);text-transform:uppercase;letter-spacing:.05em;min-width:0}
@@ -205,8 +208,8 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
     <p class="rampinfo" id="dRampInfo"></p>
     <div class="dsum" id="dSum"></div>
     <ul class="reasons" id="dNotes"></ul>
-    <div class="phead"><h3 class="sub">Your drift on the good-water map</h3><button type="button" class="xbtn" data-zoom="dmap" aria-label="Enlarge the drift map">⤢ Enlarge</button></div>
-    <div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:var(--ink)"></i>Your drift</span></div>
+    <h3 class="sub">Your drift on the good-water map</h3>
+    <div class="maptools"><div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:var(--ink)"></i>Your drift</span></div><button type="button" class="xbtn" data-zoom="dmap" aria-label="Enlarge the drift map">⤢ Enlarge</button></div>
     <div class="mapwrap"><svg id="dmap" class="rmap" viewBox="0 0 640 440" width="100%" role="img" aria-label="Your drift drawn over fishing quality by river location and time"></svg><div class="readout mapRead" id="dRead" hidden></div></div>
     <p class="foot" id="dFoot"></p>
   </section>
@@ -241,16 +244,17 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 
 
   <section class="panel">
-    <div class="phead"><h2 id="mapTitle">Where the good water is</h2><button type="button" class="xbtn" data-zoom="rmap" aria-label="Enlarge the good-water map">⤢ Enlarge</button></div>
+    <h2 id="mapTitle">Where the good water is</h2>
     <p class="foot">Each row is a spot on the river, top is the dam, and each column is 15 minutes. Blue is release water moving downstream; green is good fishing water. With a fast boat, stay in the green: fish ahead of the blue band, then run back up behind it. Below Morgan Falls Dam, past hours use the Atlanta gauge’s readings and future hours follow Georgia Power’s Morgan Falls turbine schedule (2+ units shows as release water, 1 unit as partly raised). Tap the map for details.</p>
-    <div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:color-mix(in srgb,var(--river) 45%,var(--panel))"></i>Rising or falling</span></div>
+    <div class="maptools"><div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:color-mix(in srgb,var(--river) 45%,var(--panel))"></i>Rising or falling</span></div><button type="button" class="xbtn" data-zoom="rmap" aria-label="Enlarge the good-water map">⤢ Enlarge</button></div>
     <div class="mapwrap"><svg id="rmap" class="rmap" viewBox="0 0 640 440" width="100%" role="img" aria-label="Fishing quality by river location and time of day"></svg><div class="readout mapRead" id="mapRead" hidden></div></div>
   </section>
 
   <section class="panel">
     <div class="phead"><h2>Last 48 hours</h2><button type="button" class="xbtn" data-zoom="chart" aria-label="Enlarge the 48-hour chart">⤢ Enlarge</button></div>
+    <p class="foot" id="chartSrc" style="margin:0 0 6px"></p>
     <div class="chartwrap"><svg id="chart" viewBox="0 0 640 230" width="100%" role="img" aria-label="River stage at Medlock and dam outflow, last 48 hours"></svg><div class="readout" id="readout" hidden></div></div>
-    <div class="legend"><span><i style="background:var(--river)"></i>Medlock stage (ft)</span><span><i style="background:var(--dam)"></i>Dam outflow (cfs)</span><span><i style="background:var(--turb)"></i>Turbidity (FNU)</span><span><i style="background:var(--ecoli)"></i>E. coli (line = 235 limit)</span></div>
+    <div class="legend"><span><i style="background:var(--river)"></i><span class="stageLbl">Medlock stage (ft)</span></span><span><i style="background:var(--dam)"></i>Dam outflow (cfs)</span><span><i style="background:var(--turb)"></i>Turbidity (FNU)</span><span><i style="background:var(--ecoli)"></i>E. coli (line = 235 limit)</span></div>
   </section>
 
   <section class="panel">
@@ -461,6 +465,7 @@ function render(S){
   ].join('');
 
   drawChart(medStage,dam,turb,ecoli,now);
+  setTimeout(()=>drawRampChart('chart'),0);
   const atlSt=S[SITES.atl+':00065']||[], baseAtl=atlSt.length?pct(atlSt.map(x=>x.v),0.1):null;
   LAST={S,ev,base,baseAtl,now,condScore:score,R,phaseTxt};
   renderWindows();
@@ -468,25 +473,61 @@ function render(S){
   $('updated').textContent='Updated '+fmtDT(now)+(st?' · latest Medlock reading '+fmtT(st.t):'');
 }
 
-let CHART=null;
+const CHARTS={}, CHART_READ={chart:'readout',zchart:'zReadout'};
+// USGS gauges with water level along the river (river km below the dam)
+const GAUGES=[
+  {site:'02334430',km:0.7,name:'Buford Dam',pool:'upper'},
+  {site:'02334500',km:4.7,name:'near GA 20',pool:'upper'},
+  {site:'02334653',km:13.7,name:'above McGinnis Ferry',pool:'upper'},
+  {site:'02335000',km:29.7,name:'Medlock Bridge',pool:'upper'},
+  {site:'02335450',km:46.0,name:'above Roswell',pool:'upper'},
+  {site:'02335815',km:59.1,name:'below Morgan Falls Dam',pool:'lower'},
+  {site:'02336000',km:75.0,name:'Atlanta (Paces Ferry)',pool:'lower'}];
+const nearestGauge=L=>GAUGES.filter(g=>g.pool===L.pool).reduce((a,b)=>Math.abs(b.km-L.km)<Math.abs(a.km-L.km)?b:a);
+const G48={};
+async function gaugeStage(site){
+  const S=LAST&&LAST.S, have=S&&S[site+':00065'];
+  if(have&&have.length) return have;
+  const c=G48[site]; if(c&&Date.now()-c.at<10*60e3) return c.data;
+  try{
+    const r=await fetch(`https://waterservices.usgs.gov/nwis/iv/?format=json&siteStatus=all&period=P2D&sites=${site}&parameterCd=00065`,{cache:'no-store'});
+    const j=await r.json(), blk=j.value.timeSeries[0]?.values.find(b=>b.value.length);
+    const data=blk?blk.value.filter(v=>v.value!=='-999999').map(v=>({t:new Date(v.dateTime),v:+v.value})):[];
+    G48[site]={at:Date.now(),data}; return data;
+  }catch(e){ return null; }
+}
+// Draw the 48-hour chart for the selected ramp: nearest gauge's water level, dam outflow,
+// and clarity/E. coli from Medlock (upper river) or Atlanta (below Morgan Falls)
+async function drawRampChart(id){
+  if(!LAST) return;
+  const L=launch(), g=nearestGauge(L), S=LAST.S, q=L.pool==='lower'?SITES.atl:SITES.med;
+  let stage=await gaugeStage(g.site); const ok=!!(stage&&stage.length);
+  if(!ok) stage=S[SITES.med+':00065']||[];
+  drawChart(stage,S[SITES.dam+':00060']||[],S[q+':63680']||[],S[q+':99407']||[],LAST.now,id);
+  const lbl=`Stage at ${ok?g.name:'Medlock Bridge'} gauge (ft)`;
+  document.querySelectorAll('.stageLbl').forEach(e=>e.textContent=lbl);
+  const src=`${L.name}: water level from the USGS gauge ${ok?g.name:'at Medlock Bridge'}${ok&&Math.abs(g.km-L.km)>1.5?` (${(Math.abs(g.km-L.km)/1.609).toFixed(1)} mi ${g.km>L.km?'downstream':'upstream'})`:''}${ok?'':' (that gauge didn’t answer)'}; turbidity and E. coli from ${q===SITES.atl?'the Atlanta gauge':'the Medlock gauge'}.`;
+  $('chartSrc').textContent=src; if($('zChartSrc')) $('zChartSrc').textContent=src;
+}
 function chartHover(ev){
-  if(!CHART) return;
-  const svg=$('chart'), box=svg.getBoundingClientRect(), {t0,t1,L,w,W,ys}=CHART;
+  const svg=ev.currentTarget, CHART=CHARTS[svg.id]; if(!CHART) return;
+  const box=svg.getBoundingClientRect(), {t0,t1,L,w,W,ys}=CHART;
   const vx=(ev.clientX-box.left)/box.width*W;
-  if(vx<L||vx>L+w){chartLeave();return}
+  if(vx<L||vx>L+w){chartLeave(ev);return}
   const t=t0+(vx-L)/w*(t1-t0);
-  if(t>+CHART.now){chartLeave();return}
+  if(t>+CHART.now){chartLeave(ev);return}
   const near=a=>{const i=bsearch(a,t);if(i<0) return null;const j=Math.min(i+1,a.length-1);return Math.abs(a[j].t-t)<Math.abs(a[i].t-t)?a[j]:a[i]};
   const st=near(CHART.stage), dq=near(CHART.dam), tu=near(CHART.turb), ec=near(CHART.ecoli);
-  $('hover').style.display=''; $('hLine').setAttribute('x1',vx); $('hLine').setAttribute('x2',vx);
-  if(st){$('hDot').setAttribute('cx',vx);$('hDot').setAttribute('cy',ys(st.v))}
+  const hv=svg.querySelector('.hover'), hl=svg.querySelector('.hLine'), hd=svg.querySelector('.hDot');
+  hv.style.display=''; hl.setAttribute('x1',vx); hl.setAttribute('x2',vx);
+  if(st){hd.setAttribute('cx',vx);hd.setAttribute('cy',ys(st.v))}
   const d=new Date(t);
   const rows=[
     ['--river','Stage',st?st.v.toFixed(2)+' ft':'–'],
     ['--dam','Dam',dq?Math.round(dq.v).toLocaleString()+' cfs':'–'],
     ['--turb','Turbidity',tu?tu.v+' FNU':'–'],
     ['--ecoli','E. coli',ec?ec.v+(ec.v>=235?' ⚠':'')+' /100 mL':'–']];
-  const r=$('readout');
+  const r=$(CHART_READ[svg.id]);
   r.innerHTML=`<div class="t">${d.toLocaleDateString([], {weekday:'short'})} ${d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</div>`+rows.map(([c,k,v])=>`<div><i style="background:var(${c})"></i>${k} <b>${v}</b></div>`).join('');
   r.hidden=false;
   const px=(vx/W)*box.width, rw=r.offsetWidth, wrapW=svg.parentElement.clientWidth;
@@ -643,8 +684,12 @@ function openZoom(kind,rot){
   z.classList.toggle('rot',ZOOM.rot); $('zoomRotate').textContent=ZOOM.rot?'⟳ Portrait':'⟳ Landscape';
   if(kind==='chart'){
     $('zoomTitle').textContent='Last 48 hours';
-    const c=$('chart').cloneNode(true); c.id='zchart'; c.querySelector('#hover')?.remove();
-    body.innerHTML=''; body.appendChild(c); body.insertAdjacentHTML('beforeend',document.querySelector('#chart').closest('section').querySelector('.legend').outerHTML);
+    body.innerHTML=`<div class="tripctl"><label>Boat ramp<select id="zRamp">${rampOptions(LAUNCHES)}</select></label></div><p class="foot" id="zChartSrc"></p><svg id="zchart" viewBox="0 0 640 230" width="100%" role="img" aria-label="Enlarged 48-hour chart" style="touch-action:pan-y;cursor:crosshair"></svg><div class="readout" id="zReadout" hidden></div>`+document.querySelector('#chart').closest('section').querySelector('.legend').outerHTML;
+    $('zRamp').value=TRIP.launch;
+    $('zRamp').addEventListener('change',()=>{ const t=$('tLaunch'); t.value=$('zRamp').value; t.dispatchEvent(new Event('change')); drawRampChart('zchart'); });
+    drawChart(...CHARTS.chart.args,'zchart'); drawRampChart('zchart');
+    for(const ev of ['pointermove','pointerdown']) $('zchart').addEventListener(ev,chartHover);
+    $('zchart').addEventListener('pointerleave',chartLeave);
   } else {
     const drift=kind==='dmap';
     $('zoomTitle').textContent=drift?'Your drift':$('mapTitle').textContent;
@@ -663,20 +708,23 @@ $('zoomRotate').addEventListener('click',()=>openZoom(ZOOM.kind,!ZOOM.rot));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ZOOM) closeZoom()});
 // If the phone itself is turned sideways, the viewer doesn't need to rotate too
 try{matchMedia('(orientation: landscape)').addEventListener('change',e=>{ if(ZOOM&&ZOOM.rot&&e.matches) openZoom(ZOOM.kind,false); else if(ZOOM&&ZOOM.kind!=='chart') openZoom(ZOOM.kind,ZOOM.rot); })}catch(e){}
-function chartLeave(){ if($('hover')) $('hover').style.display='none'; $('readout').hidden=true; }
+function chartLeave(ev){ const svg=ev&&ev.currentTarget&&ev.currentTarget.id?ev.currentTarget:$('chart'); const hv=svg.querySelector('.hover'); if(hv) hv.style.display='none'; const r=$(CHART_READ[svg.id]); if(r) r.hidden=true; }
 $('chart').addEventListener('pointermove',chartHover);
 $('chart').addEventListener('pointerdown',chartHover);
 $('chart').addEventListener('pointerleave',chartLeave);
-function drawChart(stage,dam,turb,ecoli,now){
+function drawChart(stage,dam,turb,ecoli,now,id='chart'){
   const W=640,Hh=230,L=36,Rr=46,Tp=12,B=26, w=W-L-Rr, h=Hh-Tp-B;
   const t0=+now-48*H, t1=+now+12*H;
   const x=t=>L+(t-t0)/(t1-t0)*w;
-  const sMax=Math.max(6,...stage.map(p=>p.v))+0.5, sMin=0;
+  const sv=stage.filter(p=>+p.t>=t0).map(p=>p.v);
+  let sMin=sv.length?Math.floor(Math.min(...sv)-0.5):0, sMax=sv.length?Math.ceil(Math.max(...sv)+0.5):6;
+  if(sMin>=0 && sMin<2) sMin=0; if(sMax-sMin<4) sMax=sMin+4;
+  const sStep=sMax-sMin>12?4:sMax-sMin>6?2:1;
   const dMax=Math.max(10000,...dam.map(p=>p.v));
   const ys=v=>Tp+h-(v-sMin)/(sMax-sMin)*h, yd=v=>Tp+h-v/dMax*h;
   const path=(arr,y)=>arr.filter(p=>+p.t>=t0).map((p,i)=>(i?'L':'M')+x(+p.t).toFixed(1)+' '+y(p.v).toFixed(1)).join('');
   let g='';
-  for(let v=0;v<=sMax;v+=2){g+=`<line x1="${L}" x2="${L+w}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${L-6}" y="${ys(v)+4}" text-anchor="end">${v}</text>`}
+  for(let v=Math.ceil(sMin/sStep)*sStep;v<=sMax;v+=sStep){g+=`<line x1="${L}" x2="${L+w}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${L-6}" y="${ys(v)+4}" text-anchor="end">${v}</text>`}
   for(let v=0;v<=dMax;v+=5000){g+=`<text x="${L+w+6}" y="${yd(v)+4}">${v/1000}k</text>`}
   // day ticks
   const d=new Date(t0);d.setHours(0,0,0,0);
@@ -695,9 +743,9 @@ function drawChart(stage,dam,turb,ecoli,now){
   if(sp){g+=`<path d="${sp}" fill="none" stroke="var(--river)" stroke-width="2.2"/>`;
     const lp=last(pts); g+=`<circle cx="${x(+lp.t)}" cy="${ys(lp.v)}" r="4" fill="var(--river)"/>`}
   g+=`<text x="${L}" y="${Tp-2}">ft</text><text x="${L+w+6}" y="${Tp-2}">cfs</text>`;
-  g+=`<g id="hover" style="display:none"><line id="hLine" y1="${Tp}" y2="${Tp+h}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3" opacity=".6"/><circle id="hDot" r="4" fill="var(--river)" stroke="var(--panel)" stroke-width="1.5"/></g>`;
-  $('chart').innerHTML=g;
-  CHART={stage,dam,turb,ecoli,t0,t1,L,w,W,ys,now};
+  g+=`<g class="hover" style="display:none"><line class="hLine" y1="${Tp}" y2="${Tp+h}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3" opacity=".6"/><circle class="hDot" r="4" fill="var(--river)" stroke="var(--panel)" stroke-width="1.5"/></g>`;
+  $(id).innerHTML=g;
+  CHARTS[id]={stage,dam,turb,ecoli,t0,t1,L,w,W,ys,now,args:[stage,dam,turb,ecoli,now]};
 }
 
 const MONTHS=[
@@ -1134,6 +1182,7 @@ function tripControls(){
     TRIP={boat,motor,float,launch:launchId,take}; sync(); TRIP.take=$('tTake').value;
     try{localStorage.setItem('medlockTrip',JSON.stringify(TRIP))}catch(e){}
     if(LAST) render(LAST.S); else renderWindows();
+    if(ZOOM&&ZOOM.kind==='chart'&&$('zRamp')){ $('zRamp').value=TRIP.launch; drawRampChart('zchart'); }
   });
 }
 tripControls();

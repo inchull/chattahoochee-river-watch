@@ -1080,8 +1080,20 @@ function tripNotes(tr){
   return out;
 }
 
+// River is closed to fishing outside 30 min before sunrise to 30 min after sunset
+const closedAt=(T,sunT)=>T<+sunT.rise-30*60e3||T>+sunT.set+30*60e3;
+function renderClosed(T,sunT,L,projected){
+  $('score').style.borderColor='var(--bad)'; $('score').innerHTML='0<span>SCORE</span>';
+  $('verdict').textContent='River closed';
+  const t=new Date(T), next=+t<+sunT.rise-30*60e3?sunT.rise:sun(new Date(t.getFullYear(),t.getMonth(),t.getDate()+1)).rise;
+  const opens=new Date(+next-30*60e3);
+  $('verdictSub').textContent=`${projected?`Projected for ${t.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(t)} at ${L.name}. `:''}Fishing opens ${opens.toDateString()===t.toDateString()?'':opens.toLocaleDateString([], {weekday:'short'})+' '}at ${fmtT(opens)}.`;
+  $('reasons').innerHTML=[['b',`Outside legal fishing hours: 30 min before sunrise (${fmtT(sunT.rise)}) to 30 min after sunset (${fmtT(sunT.set)}).`]].map(([c,x])=>`<li><i class="dot ${c}"></i><span>${x}</span></li>`).join('');
+}
 function renderProjected(ctx,T){
-  const L=launch(), sunT=sun(new Date(T)), tr=tripScore(T,ctx,sunT), f=fishQ(T,L.km,ctx,sunT), st=stateAt(L.km,T,ctx);
+  const L=launch(), sunT=sun(new Date(T));
+  if(closedAt(T,sunT)) return renderClosed(T,sunT,L,true);
+  const tr=tripScore(T,ctx,sunT), f=fishQ(T,L.km,ctx,sunT), st=stateAt(L.km,T,ctx);
   const cond=f&&!f.dark?f.q:0;
   const score=tr.score==null?cond:Math.round(0.35*cond+0.65*tr.score);
   const col=score>=75?'var(--good)':score>=50?'var(--warn)':'var(--bad)';
@@ -1138,6 +1150,7 @@ function whenControls(){
 function renderVerdict(ctx){
   if(FISH_AT) return renderProjected(ctx,FISH_AT);
   const {now,condScore,R,phaseTxt}=LAST; const sunT=sun(now);
+  if(closedAt(+now,sunT)) return renderClosed(+now,sunT,launch(),false);
   const tr=tripScore(+now,ctx,sunT);
   const score=tr.score==null?condScore:Math.round(0.35*condScore+0.65*tr.score);
   const col=score>=75?'var(--good)':score>=50?'var(--warn)':'var(--bad)';

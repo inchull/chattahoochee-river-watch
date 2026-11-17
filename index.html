@@ -435,6 +435,7 @@ function render(S){
     if(!t) return `<li><time>–</time><span>${txt}</span></li>`;
     const cls=t<now?'past':(Math.abs(t-now)<1.5*H?'now':'');
     return `<li class="${cls}"><time>${fmtT(t)}</time><span>${txt} <span class="foot">${t.toDateString()!==now.toDateString()?t.toLocaleDateString([], {weekday:'short'})+' · ':''}${relH(t)}</span></span></li>`}).join('');
+  LIVE_TL={status,html:$('timeline').innerHTML};
 
   // Score
   let score=100, R=[];
@@ -782,7 +783,7 @@ function renderSeason(now){
 }
 
 // ---------- Fishing windows ----------
-let LAST=null, SCHED=null, MF=null, DRIFT_LAST=null;
+let LAST=null, SCHED=null, MF=null, DRIFT_LAST=null, LIVE_TL=null;
 const SLOT=30*60e3;
 // Release effect at Medlock (measured, 36 clean releases): too high to wade from on+5h until off+12h; settled by off+15h
 const M={caution:4.5, high:5, wadeAfterOff:12, settleAfterOff:15, mwRelease:20};
@@ -1090,9 +1091,35 @@ function renderClosed(T,sunT,L,projected){
   $('verdictSub').textContent=`${projected?`Projected for ${t.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(t)} at ${L.name}. `:''}Fishing opens ${opens.toDateString()===t.toDateString()?'':opens.toLocaleDateString([], {weekday:'short'})+' '}at ${fmtT(opens)}.`;
   $('reasons').innerHTML=[['b',`Outside legal fishing hours: 30 min before sunrise (${fmtT(sunT.rise)}) to 30 min after sunset (${fmtT(sunT.set)}).`]].map(([c,x])=>`<li><i class="dot ${c}"></i><span>${x}</span></li>`).join('');
 }
+// The release that shapes a trip launched at T: the latest one whose water is still at the ramp
+// (or upstream turnaround) at launch, else the next one that reaches it before the trip ends.
+function releaseFor(ctx,T){
+  const L=launch(), P=tripPath(T), kms=[L.km,P.turn??L.km], end=P.end||T+(TRIP.float||3)*H;
+  const rel=[...ctx.rel].sort((a,b)=>a.on-b.on);
+  const near=Math.min(...kms.map(k=>prof(k).rise)), far=Math.max(...kms.map(k=>prof(k).settle));
+  let cur=null, next=null;
+  for(const r of rel){ const off=+(r.off||new Date(+r.on+2.5*H));
+    if(+r.on+near*H<=T && off+far*H>T) cur=r;
+    else if(+r.on+near*H>T && !next) next=r; }
+  return cur||(next&&+next.on+near*H<end+6*H?next:null)||next;
+}
+function projTimeline(ctx,T){
+  const L=launch(), r=releaseFor(ctx,T), when=new Date(T), day=d=>d.toDateString()!==when.toDateString()?d.toLocaleDateString([], {weekday:'short'})+' · ':'';
+  const rel=t=>{const d=(t-T)/H; return Math.abs(d)<0.1?'at launch':d<0?`${(-d).toFixed(1)} h before you launch`:`${d.toFixed(1)} h after you launch`};
+  if(!r){ $('releaseStatus').textContent=`Projected for ${when.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(when)}: no scheduled release reaches ${L.name} around your trip.`; $('timeline').innerHTML=''; return null; }
+  const on=new Date(r.on), off=new Date(r.off||+r.on+2.5*H), p=prof(L.km), P=tripPath(T);
+  const src=r.src==='sched'?'Corps schedule':'dam gauge';
+  $('releaseStatus').textContent=`Projected for ${when.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(when)}. Release ${day(on)}${fmtT(on)} to ${fmtT(off)} (${((off-on)/H).toFixed(1)} h, ${src}).`;
+  const lines=[[on,'Dam opens'],[off,'Dam shuts off']];
+  if(P.turn!=null && Math.abs(P.turn-L.km)>1){ const pt=prof(P.turn), nm=(LAUNCHES.slice().sort((a,b)=>Math.abs(a.km-P.turn)-Math.abs(b.km-P.turn))[0]); lines.push([new Date(+on+pt.rise*H),`Water starts rising at your turnaround (near ${SHORT[nm.id]||nm.name})`]); }
+  lines.push([new Date(+on+p.rise*H),`Water starts rising at ${SHORT[L.id]||L.name}`],[new Date(+on+p.peak*H),`${SHORT[L.id]||L.name} peak, about +${p.ft.toFixed(1)} ft`],[new Date(+off+p.wade*H),'Wadeable again'],[new Date(+off+p.settle*H),'Back to normal low water']);
+  lines.push([when,TRIP.boat==='wade'?'You start wading':'You launch']); lines.sort((a,b)=>a[0]-b[0]);
+  $('timeline').innerHTML=lines.map(([t,txt])=>+t===T?`<li class="now"><time>${fmtT(t)}</time><span><b>${txt}</b> <span class="foot">${day(t)}</span></span></li>`:`<li class="${t<when?'past':''}"><time>${fmtT(t)}</time><span>${txt} <span class="foot">${day(t)}${rel(+t)}</span></span></li>`).join('');
+  return {r,on,off,rise:new Date(+on+p.rise*H),wade:new Date(+off+p.wade*H)};
+}
 function renderProjected(ctx,T){
   const L=launch(), sunT=sun(new Date(T));
-  if(closedAt(T,sunT)) return renderClosed(T,sunT,L,true);
+  if(closedAt(T,sunT)){ projTimeline(ctx,T); return renderClosed(T,sunT,L,true); }
   const tr=tripScore(T,ctx,sunT), f=fishQ(T,L.km,ctx,sunT), st=stateAt(L.km,T,ctx);
   const cond=f&&!f.dark?f.q:0;
   const score=tr.score==null?cond:Math.round(0.35*cond+0.65*tr.score);
@@ -1104,8 +1131,9 @@ function renderProjected(ctx,T){
   $('verdictSub').textContent=`Projected for ${when} at ${L.name}.${end}`;
   const notes=tr.score==null?[]:tripNotes(tr);
   if(tr.score!=null&&!notes.length) notes.push(['g','No release water reaches you on this trip.']);
-  const water={low:'Low, normal water at the ramp.',falling:'Water still dropping after a release.',caution:'Release water starting to arrive at the ramp.',high:'Release water at the ramp: high and fast.'}[st&&st.water]||'';
-  const R=[];
+  const water={low:'Low, normal water at the ramp when you launch.',falling:'Water still dropping at the ramp when you launch.',caution:'Release water starting to arrive at the ramp as you launch.',high:'Release water at the ramp when you launch: high and fast.'}[st&&st.water]||'';
+  const R=[], pr=projTimeline(ctx,T);
+  if(pr) R.push(['w',`Scheduled release ${fmtT(pr.on)}–${fmtT(pr.off)}${pr.on.toDateString()!==new Date(T).toDateString()?' '+pr.on.toLocaleDateString([], {weekday:'short'}):''}: water rises at ${SHORT[L.id]||L.name} about ${fmtT(pr.rise)}, wadeable again about ${fmtT(pr.wade)}.`]);
   if(water) R.push([st.water==='low'?'g':st.water==='high'?'b':'w',water]);
   if(st&&st.turb!=null) R.push([st.turb<5?'g':st.turb<15?'w':'b',`Turbidity about ${st.turb} FNU (projected).`]);
   if(st&&st.ec!=null) R.push([st.ec<235?'g':'b',`E. coli estimate about ${st.ec}/100 mL (projected).`]);
@@ -1149,6 +1177,7 @@ function whenControls(){
 }
 function renderVerdict(ctx){
   if(FISH_AT) return renderProjected(ctx,FISH_AT);
+  if(LIVE_TL){ $('releaseStatus').textContent=LIVE_TL.status; $('timeline').innerHTML=LIVE_TL.html; }
   const {now,condScore,R,phaseTxt}=LAST; const sunT=sun(now);
   if(closedAt(+now,sunT)) return renderClosed(+now,sunT,launch(),false);
   const tr=tripScore(+now,ctx,sunT);

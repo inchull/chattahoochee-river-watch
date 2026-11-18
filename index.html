@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Only this page's own script may run. After editing the script at the bottom of this file, run: python3 -I scripts/csp_hash.py -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wkM+XRhPFnobE4LAy/a8x63MyCqD9OPlzHPk7ej3GqQ='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://waterservices.usgs.gov; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Hoo-Watch">
@@ -320,7 +322,7 @@ const CACHE_KEY='usgsCacheV2', MIN_GAP=2*60e3, FULL_DAYS=31;
 let DATA=null, lastFetch=0, inflight=null;
 function cacheLoad(){
   try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); if(!c) return null;
-    const S={}; for(const [k,arr] of Object.entries(c.S)) S[k]=arr.map(([t,v])=>({t:new Date(t),v}));
+    const S={}; for(const [k,arr] of Object.entries(c.S)) S[k]=arr.map(([t,v])=>({t:new Date(t),v:+v}));
     return {S,fetchedAt:c.fetchedAt};}catch(e){return null}
 }
 function cacheSave(S,fetchedAt){
@@ -793,10 +795,28 @@ let LAST=null, SCHED=null, MF=null, DRIFT_LAST=null, LIVE_TL=null;
 const SLOT=30*60e3;
 // Release effect at Medlock (measured, 36 clean releases): too high to wade from on+5h until off+12h; settled by off+15h
 const M={caution:4.5, high:5, wadeAfterOff:12, settleAfterOff:15, mwRelease:20};
+// The two data files are written by scrapers that read other organisations' pages, and parts of them are
+// shown with innerHTML. Rebuild each file from numbers and checked date strings only; if any field is not
+// what it should be, throw so the whole file is dropped and nothing fetched reaches the page as text.
+const num=v=>{const n=(typeof v==='number'||(typeof v==='string'&&v.trim()))?Number(v):NaN; if(!Number.isFinite(n)) throw new Error('not a number'); return n};
+const isDay=k=>/^\d{4}-\d{2}-\d{2}$/.test(k), isHM=k=>/^\d{2}:\d{2}$/.test(k);
+const isoTime=v=>{ if(typeof v!=='string'||!/^[\d:T.+Z-]+$/.test(v)||isNaN(new Date(v))) throw new Error('not a time'); return v};
+function cleanSched(j){
+  const days={};
+  for(const [day,hrs] of Object.entries(j.days)){ if(!isDay(day)) throw new Error('not a day'); days[day]=hrs.map(h=>({hour:num(h.hour),mw:num(h.mw)})); }
+  return {days,updated:isoTime(j.updated)};
+}
+function cleanMF(j){
+  const schedule={};
+  for(const [day,hrs] of Object.entries(j.schedule||{})){ if(!isDay(day)) throw new Error('not a day'); schedule[day]={};
+    for(const [hm,u] of Object.entries(hrs)){ if(!isHM(hm)) throw new Error('not an hour'); schedule[day][hm]=num(u); } }
+  const c=j.current;
+  return {schedule,current:c?{time:isoTime(c.time),flow:num(c.flow),units:num(c.units),elevation:num(c.elevation)}:null};
+}
 async function loadSchedule(){
-  try{const r=await fetch('data/schedule.json',{cache:'no-store'}); if(!r.ok) throw 0; SCHED=await r.json();}
+  try{const r=await fetch('data/schedule.json',{cache:'no-store'}); if(!r.ok) throw 0; SCHED=cleanSched(await r.json());}
   catch(e){SCHED=null}
-  try{const r=await fetch('data/morganfalls.json',{cache:'no-store'}); if(!r.ok) throw 0; MF=await r.json();}
+  try{const r=await fetch('data/morganfalls.json',{cache:'no-store'}); if(!r.ok) throw 0; MF=cleanMF(await r.json());}
   catch(e){MF=null}
 }
 // Morgan Falls turbine units in effect at time t (Eastern), from Georgia Power's tentative schedule; null if unknown

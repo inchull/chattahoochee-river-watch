@@ -1166,26 +1166,38 @@ function horizon(L){
   if(L&&L.pool==='lower'){ const mk=MF&&MF.schedule?Object.keys(MF.schedule).sort():[]; const mh=mk.length?endOf(mk[mk.length-1]):now; if(mh<h) h=mh; }
   return h<now?now:h;
 }
-function syncWhen(){
+function syncWhen(force){
   const now=new Date(), h=horizon(launch()), el=$('tWhen');
   el.min=toLocalInput(now); el.max=toLocalInput(h);
   if(FISH_AT && FISH_AT>+h){ FISH_AT=null; showWhenMsg(`Schedules are only posted through ${h.toLocaleDateString([], {weekday:'short'})} ${fmtT(h)}, so this switched back to now.`); }
   if(FISH_AT && FISH_AT<+now-5*60e3) FISH_AT=null;
-  el.value=toLocalInput(FISH_AT?new Date(FISH_AT):now);
+  if(force||document.activeElement!==el) el.value=toLocalInput(FISH_AT?new Date(FISH_AT):now);
   $('tNow').setAttribute('aria-pressed',FISH_AT?'false':'true');
 }
 function showWhenMsg(t){ const m=$('whenMsg'); m.textContent=t; m.hidden=!t; }
+// iPhone pickers fire input/change on every wheel spin and the check mark only blurs the field,
+// so apply the pick when the field loses focus (or after a pause), and never rewrite it while it's open.
+let WHEN_T=null;
+function applyWhen(final){
+  clearTimeout(WHEN_T);
+  const el=$('tWhen'), v=el.value; showWhenMsg('');
+  if(!v){ if(final) FISH_AT=null; }
+  else {
+    const t=+new Date(v), now=Date.now(), h=+horizon(launch());
+    const lastDay=new Date(h).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'});
+    if(t>h){ showWhenMsg(`The release schedule is only posted through ${lastDay}${launch().pool==='lower'?' (Corps and Georgia Power)':''}. Pick a time on or before then.`); if(!final) return; }
+    else if(t<now-5*60e3){ showWhenMsg('That time has passed. Pick a time from now on.'); if(!final) return; }
+    else FISH_AT = t<=now+5*60e3 ? null : t;
+  }
+  syncWhen(final);
+  if(LAST) renderWindows();
+}
 function whenControls(){
-  $('tWhen').addEventListener('change',()=>{
-    const v=$('tWhen').value; showWhenMsg('');
-    if(!v){ FISH_AT=null; }
-    else {
-      const t=+new Date(v), now=Date.now(), h=+horizon(launch());
-      if(t>h){ showWhenMsg(`The release schedule is only posted through ${new Date(h).toLocaleDateString([], {weekday:'short'})}${launch().pool==='lower'?' (Corps and Georgia Power)':''}. Pick an earlier time.`); }
-      else FISH_AT = t<=now+5*60e3 ? null : t;
-    }
-    syncWhen(); if(LAST) renderWindows();
-  });
+  const el=$('tWhen');
+  const later=()=>{ clearTimeout(WHEN_T); WHEN_T=setTimeout(()=>applyWhen(false),700); };
+  el.addEventListener('input',later);
+  el.addEventListener('change',later);
+  el.addEventListener('blur',()=>applyWhen(true));
   $('tNow').addEventListener('click',()=>{ FISH_AT=null; showWhenMsg(''); syncWhen(); if(LAST) renderWindows(); });
 }
 function renderVerdict(ctx){

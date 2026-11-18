@@ -164,6 +164,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 .fishat button{padding:6px 12px}
 .fishat button[aria-pressed="true"]{background:var(--river);color:var(--panel);border-color:var(--river)}
 .whenmsg{grid-column:1/-1;margin:0;font-size:12.5px;color:var(--warn);font-weight:600}
+.projrel{grid-column:1/-1;margin:0;font-size:14px;font-weight:600;color:var(--ink)}
 .rampinfo{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted);display:grid;gap:4px}
 .rampinfo:empty{display:none}
 .badge{display:inline-block;font:600 11px var(--f-body);letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;margin-right:6px;vertical-align:1px}
@@ -228,9 +229,10 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
       <label id="takeLbl" hidden>Take out at<select id="tTake"></select></label>
       <label id="floatLbl">Float back<select id="tFloat"><option value="0">—</option><option value="1">1 h</option><option value="2">2 h</option><option value="3">3 h</option><option value="3.5">3.5 h</option><option value="4">4 h</option><option value="4.5">4.5 h</option><option value="5">5 h</option></select></label>
     </div>
-    <div class="fishat"><label for="tWhen">Fish at</label><input id="tWhen" type="datetime-local" step="900"><button type="button" id="tNow">Now</button></div>
+    <div class="fishat"><label for="tWhen">Fish at</label><input id="tWhen" type="datetime-local" step="900"><button type="button" id="tNow">Set time to now</button></div>
     <p class="whenmsg" id="whenMsg" hidden></p>
     <p class="rampinfo" id="rampInfo"></p>
+    <p class="projrel" id="projRel" hidden></p>
     <div class="score" id="score">--<span>SCORE</span></div>
     <div><h3 id="verdict">Loading gauges…</h3><p id="verdictSub">Pulling live USGS readings.</p></div>
     <ul class="reasons" id="reasons"></ul>
@@ -1103,13 +1105,14 @@ function releaseFor(ctx,T){
     else if(+r.on+near*H>T && !next) next=r; }
   return cur||(next&&+next.on+near*H<end+6*H?next:null)||next;
 }
+function setProjRel(t){ const e=$('projRel'); e.textContent=t||''; e.hidden=!t; $('releaseStatus').hidden=!!t; }
 function projTimeline(ctx,T){
   const L=launch(), r=releaseFor(ctx,T), when=new Date(T), day=d=>d.toDateString()!==when.toDateString()?d.toLocaleDateString([], {weekday:'short'})+' · ':'';
   const rel=t=>{const d=(t-T)/H; return Math.abs(d)<0.1?'at launch':d<0?`${(-d).toFixed(1)} h before you launch`:`${d.toFixed(1)} h after you launch`};
-  if(!r){ $('releaseStatus').textContent=`Projected for ${when.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(when)}: no scheduled release reaches ${L.name} around your trip.`; $('timeline').innerHTML=''; return null; }
+  if(!r){ setProjRel(`Projected for ${when.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(when)}: no scheduled release reaches ${L.name} around your trip.`); $('timeline').innerHTML=''; return null; }
   const on=new Date(r.on), off=new Date(r.off||+r.on+2.5*H), p=prof(L.km), P=tripPath(T);
   const src=r.src==='sched'?'Corps schedule':'dam gauge';
-  $('releaseStatus').textContent=`Projected for ${when.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(when)}. Release ${day(on)}${fmtT(on)} to ${fmtT(off)} (${((off-on)/H).toFixed(1)} h, ${src}).`;
+  setProjRel(`Release ${day(on)}${fmtT(on)} to ${fmtT(off)} (${((off-on)/H).toFixed(1)} h, ${src}).`);
   const lines=[[on,'Dam opens'],[off,'Dam shuts off']];
   if(P.turn!=null && Math.abs(P.turn-L.km)>1){ const pt=prof(P.turn), nm=(LAUNCHES.slice().sort((a,b)=>Math.abs(a.km-P.turn)-Math.abs(b.km-P.turn))[0]); lines.push([new Date(+on+pt.rise*H),`Water starts rising at your turnaround (near ${SHORT[nm.id]||nm.name})`]); }
   lines.push([new Date(+on+p.rise*H),`Water starts rising at ${SHORT[L.id]||L.name}`],[new Date(+on+p.peak*H),`${SHORT[L.id]||L.name} peak, about +${p.ft.toFixed(1)} ft`],[new Date(+off+p.wade*H),'Wadeable again'],[new Date(+off+p.settle*H),'Back to normal low water']);
@@ -1177,6 +1180,7 @@ function whenControls(){
 }
 function renderVerdict(ctx){
   if(FISH_AT) return renderProjected(ctx,FISH_AT);
+  setProjRel('');
   if(LIVE_TL){ $('releaseStatus').textContent=LIVE_TL.status; $('timeline').innerHTML=LIVE_TL.html; }
   const {now,condScore,R,phaseTxt}=LAST; const sunT=sun(now);
   if(closedAt(+now,sunT)) return renderClosed(+now,sunT,launch(),false);

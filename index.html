@@ -1105,6 +1105,16 @@ function releaseFor(ctx,T){
     else if(+r.on+near*H>T && !next) next=r; }
   return cur||(next&&+next.on+near*H<end+6*H?next:null)||next;
 }
+// Live mode: list today's releases (measured at the dam, or from the Corps schedule)
+function todayReleases(ctx){
+  const now=+ctx.now, k=dayKey(new Date(now));
+  const list=ctx.rel.filter(r=>dayKey(new Date(r.on))===k).sort((a,b)=>a.on-b.on);
+  if(!list.length) return (SCHED&&SCHED.days[k])?'No release today.':'Today’s release schedule isn’t posted yet.';
+  const one=r=>{const on=+r.on, off=r.off?+r.off:null;
+    const st=off&&off<=now?'ran':on<=now?'running now':'scheduled';
+    return `${fmtT(new Date(on))} to ${off?fmtT(new Date(off)):'now'} (${st})`;};
+  return `Today’s release${list.length>1?'s':''}: ${list.map(one).join(', ')}.`;
+}
 function setProjRel(t){ const e=$('projRel'); e.textContent=t||''; e.hidden=!t; $('releaseStatus').hidden=!!t; }
 function projTimeline(ctx,T){
   const L=launch(), r=releaseFor(ctx,T), when=new Date(T), day=d=>d.toDateString()!==when.toDateString()?d.toLocaleDateString([], {weekday:'short'})+' · ':'';
@@ -1180,7 +1190,7 @@ function whenControls(){
 }
 function renderVerdict(ctx){
   if(FISH_AT) return renderProjected(ctx,FISH_AT);
-  setProjRel('');
+  setProjRel(todayReleases(ctx));
   if(LIVE_TL){ $('releaseStatus').textContent=LIVE_TL.status; $('timeline').innerHTML=LIVE_TL.html; }
   const {now,condScore,R,phaseTxt}=LAST; const sunT=sun(now);
   if(closedAt(+now,sunT)) return renderClosed(+now,sunT,launch(),false);

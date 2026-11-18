@@ -160,9 +160,12 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 .tripctl select,.tripctl input{max-width:100%;min-width:0}
 .fishat{grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-2px 0 2px}
 .fishat label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.fishat select{flex:1 1 auto;width:auto;min-width:0}
+.fishat #tDayW{flex:2 1 150px}.fishat #tTimeW{flex:1 1 100px}
 .fishat input{font:14px var(--f-body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:0;max-width:100%}
 .fishat button{padding:6px 12px}
 .fishat button[aria-pressed="true"]{background:var(--river);color:var(--panel);border-color:var(--river)}
+.whennote{grid-column:1/-1;margin:-4px 0 0;font-size:12px;color:var(--muted)}
 .whenmsg{grid-column:1/-1;margin:0;font-size:12.5px;color:var(--warn);font-weight:600}
 .projrel{grid-column:1/-1;margin:0;font-size:14px;font-weight:600;color:var(--ink)}
 .rampinfo{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted);display:grid;gap:4px}
@@ -180,7 +183,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 .tripctl.top{grid-column:1/-1;margin:0 0 4px;padding-bottom:12px;border-bottom:1px solid var(--line)}
 .tripctl label{display:grid;gap:3px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .tripctl select:disabled{opacity:.55}
-.tripctl select{font:14px var(--f-body);padding:6px 34px 6px 10px;border:1px solid var(--line);border-radius:8px;color:var(--ink);-webkit-appearance:none;appearance:none;background-color:var(--bg);background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 19px) 52%,calc(100% - 14px) 52%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.tripctl select,.fishat select{font:14px var(--f-body);padding:6px 34px 6px 10px;border:1px solid var(--line);border-radius:8px;color:var(--ink);-webkit-appearance:none;appearance:none;background-color:var(--bg);background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 19px) 52%,calc(100% - 14px) 52%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
 .tripctl select:focus-visible{outline:2px solid var(--river);outline-offset:1px}
 .strip.rel{height:3px;margin-top:2px;background:transparent}
 .strip.rel .s-high{background:var(--river)}
@@ -229,8 +232,9 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
       <label id="takeLbl" hidden>Take out at<select id="tTake"></select></label>
       <label id="floatLbl">Float back<select id="tFloat"><option value="0">—</option><option value="1">1 h</option><option value="2">2 h</option><option value="3">3 h</option><option value="3.5">3.5 h</option><option value="4">4 h</option><option value="4.5">4.5 h</option><option value="5">5 h</option></select></label>
     </div>
-    <div class="fishat"><label for="tWhen">Fish at</label><input id="tWhen" type="datetime-local" step="900"><button type="button" id="tNow">Set time to now</button></div>
+    <div class="fishat"><label for="tDayW">Fish at</label><select id="tDayW" aria-label="Day"></select><select id="tTimeW" aria-label="Time"></select><button type="button" id="tNow">Set time to now</button></div>
     <p class="whenmsg" id="whenMsg" hidden></p>
+    <p class="whennote" id="whenNote"></p>
     <p class="rampinfo" id="rampInfo"></p>
     <p class="projrel" id="projRel" hidden></p>
     <div class="score" id="score">--<span>SCORE</span></div>
@@ -1090,7 +1094,7 @@ function renderClosed(T,sunT,L,projected){
   $('verdict').textContent='River closed';
   const t=new Date(T), next=+t<+sunT.rise-30*60e3?sunT.rise:sun(new Date(t.getFullYear(),t.getMonth(),t.getDate()+1)).rise;
   const opens=new Date(+next-30*60e3);
-  $('verdictSub').textContent=`${projected?`Projected for ${t.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(t)} at ${L.name}. `:''}Fishing opens ${opens.toDateString()===t.toDateString()?'':opens.toLocaleDateString([], {weekday:'short'})+' '}at ${fmtT(opens)}.`;
+  $('verdictSub').textContent=`${projected?`${+t<Date.now()?'Looking back at':'Projected for'} ${t.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(t)} at ${L.name}. `:''}Fishing opens ${opens.toDateString()===t.toDateString()?'':opens.toLocaleDateString([], {weekday:'short'})+' '}at ${fmtT(opens)}.`;
   $('reasons').innerHTML=[['b',`Outside legal fishing hours: 30 min before sunrise (${fmtT(sunT.rise)}) to 30 min after sunset (${fmtT(sunT.set)}).`]].map(([c,x])=>`<li><i class="dot ${c}"></i><span>${x}</span></li>`).join('');
 }
 // The release that shapes a trip launched at T: the latest one whose water is still at the ramp
@@ -1119,7 +1123,7 @@ function setProjRel(t){ const e=$('projRel'); e.textContent=t||''; e.hidden=!t; 
 function projTimeline(ctx,T){
   const L=launch(), r=releaseFor(ctx,T), when=new Date(T), day=d=>d.toDateString()!==when.toDateString()?d.toLocaleDateString([], {weekday:'short'})+' · ':'';
   const rel=t=>{const d=(t-T)/H; return Math.abs(d)<0.1?'at launch':d<0?`${(-d).toFixed(1)} h before you launch`:`${d.toFixed(1)} h after you launch`};
-  if(!r){ setProjRel(`Projected for ${when.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(when)}: no scheduled release reaches ${L.name} around your trip.`); $('timeline').innerHTML=''; return null; }
+  if(!r){ setProjRel(`${T<Date.now()?'Looking back at':'Projected for'} ${when.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(when)}: no release reaches ${L.name} around your trip.`); $('timeline').innerHTML=''; return null; }
   const on=new Date(r.on), off=new Date(r.off||+r.on+2.5*H), p=prof(L.km), P=tripPath(T);
   const src=r.src==='sched'?'Corps schedule':'dam gauge';
   setProjRel(`Release ${day(on)}${fmtT(on)} to ${fmtT(off)} (${((off-on)/H).toFixed(1)} h, ${src}).`);
@@ -1131,7 +1135,7 @@ function projTimeline(ctx,T){
   return {r,on,off,rise:new Date(+on+p.rise*H),wade:new Date(+off+p.wade*H)};
 }
 function renderProjected(ctx,T){
-  const L=launch(), sunT=sun(new Date(T));
+  const L=launch(), sunT=sun(new Date(T)), past=T<Date.now(), PJ=past?'Looking back at':'Projected for', pj=past?'measured':'projected';
   if(closedAt(T,sunT)){ projTimeline(ctx,T); return renderClosed(T,sunT,L,true); }
   const tr=tripScore(T,ctx,sunT), f=fishQ(T,L.km,ctx,sunT), st=stateAt(L.km,T,ctx);
   const cond=f&&!f.dark?f.q:0;
@@ -1141,15 +1145,15 @@ function renderProjected(ctx,T){
   const verb=TRIP.boat==='wade'?'wade':'launch', when=`${new Date(T).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(new Date(T))}`;
   $('verdict').textContent=tr.dark||(f&&f.dark)?'Outside fishing hours':score>=75?`Good time to ${verb}`:score>=50?(TRIP.boat==='wade'?'Fishable session':'Fishable trip'):`Poor time to ${verb}`;
   const end=tr.fEnd?(tr.flags&&tr.flags.drift?` You’d reach ${tr.flags.to} about ${fmtT(new Date(tr.fEnd))}.`:` You’d be ${TRIP.boat==='wade'?'done':'back'} about ${fmtT(new Date(tr.fEnd))}.`):'';
-  $('verdictSub').textContent=`Projected for ${when} at ${L.name}.${end}`;
+  $('verdictSub').textContent=`${PJ} ${when} at ${L.name}.${end}`;
   const notes=tr.score==null?[]:tripNotes(tr);
   if(tr.score!=null&&!notes.length) notes.push(['g','No release water reaches you on this trip.']);
   const water={low:'Low, normal water at the ramp when you launch.',falling:'Water still dropping at the ramp when you launch.',caution:'Release water starting to arrive at the ramp as you launch.',high:'Release water at the ramp when you launch: high and fast.'}[st&&st.water]||'';
   const R=[], pr=projTimeline(ctx,T);
-  if(pr) R.push(['w',`Scheduled release ${fmtT(pr.on)}–${fmtT(pr.off)}${pr.on.toDateString()!==new Date(T).toDateString()?' '+pr.on.toLocaleDateString([], {weekday:'short'}):''}: water rises at ${SHORT[L.id]||L.name} about ${fmtT(pr.rise)}, wadeable again about ${fmtT(pr.wade)}.`]);
+  if(pr) R.push(['w',`${pr.r.src==='sched'?'Scheduled release':'Release'} ${fmtT(pr.on)}–${fmtT(pr.off)}${pr.on.toDateString()!==new Date(T).toDateString()?' '+pr.on.toLocaleDateString([], {weekday:'short'}):''}: water rises at ${SHORT[L.id]||L.name} about ${fmtT(pr.rise)}, wadeable again about ${fmtT(pr.wade)}.`]);
   if(water) R.push([st.water==='low'?'g':st.water==='high'?'b':'w',water]);
-  if(st&&st.turb!=null) R.push([st.turb<5?'g':st.turb<15?'w':'b',`Turbidity about ${st.turb} FNU (projected).`]);
-  if(st&&st.ec!=null) R.push([st.ec<235?'g':'b',`E. coli estimate about ${st.ec}/100 mL (projected).`]);
+  if(st&&st.turb!=null) R.push([st.turb<5?'g':st.turb<15?'w':'b',`Turbidity about ${st.turb} FNU (${pj}).`]);
+  if(st&&st.ec!=null) R.push([st.ec<235?'g':'b',`E. coli estimate about ${st.ec}/100 mL (${pj}).`]);
   if(st&&st.tf!=null) R.push([st.tf>=45&&st.tf<=65?'g':'w',`Water about ${st.tf.toFixed(0)}°F.`]);
   R.push(['w',`Sunrise ${fmtT(sunT.rise)}, sunset ${fmtT(sunT.set)}.`]);
   $('reasons').innerHTML=[...notes,...R].map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
@@ -1166,38 +1170,51 @@ function horizon(L){
   if(L&&L.pool==='lower'){ const mk=MF&&MF.schedule?Object.keys(MF.schedule).sort():[]; const mh=mk.length?endOf(mk[mk.length-1]):now; if(mh<h) h=mh; }
   return h<now?now:h;
 }
-function syncWhen(force){
-  const now=new Date(), h=horizon(launch()), el=$('tWhen');
-  el.min=toLocalInput(now); el.max=toLocalInput(h);
-  if(FISH_AT && FISH_AT>+h){ FISH_AT=null; showWhenMsg(`Schedules are only posted through ${h.toLocaleDateString([], {weekday:'short'})} ${fmtT(h)}, so this switched back to now.`); }
-  if(FISH_AT && FISH_AT<+now-5*60e3) FISH_AT=null;
-  if(force||document.activeElement!==el) el.value=toLocalInput(FISH_AT?new Date(FISH_AT):now);
+// Fish at uses two dropdowns (iPhone's calendar ignores min/max): days we have data for are pickable,
+// days whose release schedule isn't posted yet are listed but grayed out.
+function earliestData(){
+  const a=LAST&&LAST.S?(LAST.S[SITES.med+':00065']||[]):[]; return a.length?+a[0].t:Date.now()-30*86400e3;
+}
+const dayStart=t=>{const d=new Date(t); return new Date(d.getFullYear(),d.getMonth(),d.getDate())};
+function syncWhen(){
+  const now=Date.now(), h=+horizon(launch()), e=earliestData(), sel=$('tDayW'), tsel=$('tTimeW');
+  if(FISH_AT && FISH_AT>h){ FISH_AT=null; showWhenMsg(`The release schedule is only posted through ${new Date(h).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})}, so this switched back to now.`); }
+  if(FISH_AT && FISH_AT<e) FISH_AT=null;
+  const cur=new Date(FISH_AT||now), today=dayKey(new Date(now));
+  // Days: earliest data .. horizon, then 3 not-yet-posted days, grayed out
+  const opts=[]; let d=dayStart(e); const last=dayStart(h);
+  for(;d<=last;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1)) opts.push([dayKey(d),d,false]);
+  for(let i=0;i<3;i++){ opts.push([dayKey(d),d,true]); d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1); }
+  sel.innerHTML=opts.map(([k,dt,off])=>`<option value="${k}"${off?' disabled':''}${k===dayKey(cur)?' selected':''}>${k===today?'Today':dt.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})}${off?' (not posted)':''}</option>`).join('');
+  // Times: 15-minute steps; on the first and last day, only times we have data or a schedule for
+  const k=sel.value, [y,m,dd]=k.split('-').map(Number), base=+new Date(y,m-1,dd);
+  const curM=FISH_AT?cur.getHours()*60+Math.floor(cur.getMinutes()/15)*15:null;
+  let html=FISH_AT?'':'<option value="now" selected>Now</option>';
+  for(let mins=0;mins<1440;mins+=15){ const t=base+mins*60e3; if(t<e||t>h) continue;
+    html+=`<option value="${mins}"${mins===curM?' selected':''}>${fmtT(new Date(t))}</option>`; }
+  tsel.innerHTML=html;
+  const lastD=new Date(h).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'});
+  $('whenNote').textContent=`Pick any time back to ${new Date(e).toLocaleDateString([], {month:'short',day:'numeric'})} to see past conditions, or ahead through ${lastD}. Later days unlock once the ${launch().pool==='lower'?'Corps and Georgia Power post their schedules':'Corps posts its schedule'}.`;
   $('tNow').setAttribute('aria-pressed',FISH_AT?'false':'true');
 }
 function showWhenMsg(t){ const m=$('whenMsg'); m.textContent=t; m.hidden=!t; }
-// iPhone pickers fire input/change on every wheel spin and the check mark only blurs the field,
-// so apply the pick when the field loses focus (or after a pause), and never rewrite it while it's open.
-let WHEN_T=null;
-function applyWhen(final){
-  clearTimeout(WHEN_T);
-  const el=$('tWhen'), v=el.value; showWhenMsg('');
-  if(!v){ if(final) FISH_AT=null; }
-  else {
-    const t=+new Date(v), now=Date.now(), h=+horizon(launch());
-    const lastDay=new Date(h).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'});
-    if(t>h){ showWhenMsg(`The release schedule is only posted through ${lastDay}${launch().pool==='lower'?' (Corps and Georgia Power)':''}. Pick a time on or before then.`); if(!final) return; }
-    else if(t<now-5*60e3){ showWhenMsg('That time has passed. Pick a time from now on.'); if(!final) return; }
-    else FISH_AT = t<=now+5*60e3 ? null : t;
-  }
-  syncWhen(final);
-  if(LAST) renderWindows();
+function applyWhen(){
+  const k=$('tDayW').value, v=$('tTimeW').value; showWhenMsg('');
+  const [y,m,d]=k.split('-').map(Number);
+  let mins;
+  if(v==='now'||v===''){ // day changed while on "Now": keep the current time of day
+    const n=new Date(); mins=n.getHours()*60+Math.floor(n.getMinutes()/15)*15; }
+  else mins=+v;
+  let t=+new Date(y,m-1,d)+mins*60e3;
+  const now=Date.now(), h=+horizon(launch()), e=earliestData();
+  if(t>h) t=h-((h-+new Date(y,m-1,d))%(15*60e3));
+  if(t<e) t=e;
+  FISH_AT = Math.abs(t-now)<=7.5*60e3 ? null : t;
+  syncWhen(); if(LAST) renderWindows();
 }
 function whenControls(){
-  const el=$('tWhen');
-  const later=()=>{ clearTimeout(WHEN_T); WHEN_T=setTimeout(()=>applyWhen(false),700); };
-  el.addEventListener('input',later);
-  el.addEventListener('change',later);
-  el.addEventListener('blur',()=>applyWhen(true));
+  $('tDayW').addEventListener('change',applyWhen);
+  $('tTimeW').addEventListener('change',applyWhen);
   $('tNow').addEventListener('click',()=>{ FISH_AT=null; showWhenMsg(''); syncWhen(); if(LAST) renderWindows(); });
 }
 function renderVerdict(ctx){

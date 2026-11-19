@@ -197,6 +197,9 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 .legend2 i{display:inline-block;width:10px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
 .mono{font-family:var(--f-mono)}
 @media (prefers-reduced-motion:no-preference){.score{transition:border-color .4s}}
+.legend2 .hatch{background:repeating-linear-gradient(45deg,#7a4a1c 0 1.5px,transparent 1.5px 4px),var(--panel);outline:1px solid var(--line)}
+.legend2 .hatch.mud{background:repeating-linear-gradient(45deg,#5a3410 0 2px,transparent 2px 3px),var(--panel)}
+.turbguide{font-size:13px;color:var(--muted);margin:2px 0 8px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -219,7 +222,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
     <div class="dsum" id="dSum"></div>
     <ul class="reasons" id="dNotes"></ul>
     <h3 class="sub">Your drift on the good-water map</h3>
-    <div class="maptools"><div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:var(--ink)"></i>Your drift</span></div><button type="button" class="xbtn" data-zoom="dmap" aria-label="Enlarge the drift map">⤢ Enlarge</button></div>
+    <div class="maptools"><div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:var(--ink)"></i>Your drift</span><span><i class="hatch"></i>Stained, 10+ FNU</span></div><button type="button" class="xbtn" data-zoom="dmap" aria-label="Enlarge the drift map">⤢ Enlarge</button></div>
     <div class="mapwrap"><svg id="dmap" class="rmap" viewBox="0 0 640 440" width="100%" role="img" aria-label="Your drift drawn over fishing quality by river location and time"></svg><div class="readout mapRead" id="dRead" hidden></div></div>
     <p class="foot" id="dFoot"></p>
   </section>
@@ -260,7 +263,8 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
   <section class="panel">
     <h2 id="mapTitle">Where the good water is</h2>
     <p class="foot">Each row is a spot on the river, top is the dam, and each column is 15 minutes. Blue is release water moving downstream; green is good fishing water. With a fast boat, stay in the green: fish ahead of the blue band, then run back up behind it. Below Morgan Falls Dam, past hours use the Atlanta gauge’s readings and future hours follow Georgia Power’s Morgan Falls turbine schedule (2+ units shows as release water, 1 unit as partly raised). Tap the map for details.</p>
-    <div class="maptools"><div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:color-mix(in srgb,var(--river) 45%,var(--panel))"></i>Rising or falling</span></div><button type="button" class="xbtn" data-zoom="rmap" aria-label="Enlarge the good-water map">⤢ Enlarge</button></div>
+    <div class="maptools"><div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:color-mix(in srgb,var(--river) 45%,var(--panel))"></i>Rising or falling</span><span><i class="hatch"></i>Stained, 10+ FNU</span><span><i class="hatch mud"></i>Muddy, 20+ FNU</span></div><button type="button" class="xbtn" data-zoom="rmap" aria-label="Enlarge the good-water map">⤢ Enlarge</button></div>
+    <p class="turbguide">Turbidity for trout: <b>under 5 FNU</b> clear, good fishing · <b>5–10</b> light stain, fishable · <b>10–20</b> stained, poor · <b>20+</b> muddy, very poor.</p>
     <div class="mapwrap"><svg id="rmap" class="rmap" viewBox="0 0 640 440" width="100%" role="img" aria-label="Fishing quality by river location and time of day"></svg><div class="readout mapRead" id="mapRead" hidden></div></div>
   </section>
 
@@ -299,6 +303,9 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 
 <script>
 const LAT=33.998, LON=-84.200;
+// Turbidity bands for trout fishing (FNU): one definition used by scores, tiles, notes and the map
+const TURB_BANDS=[{max:5,c:'g',name:'Clear',fish:'good fishing'},{max:10,c:'w',name:'Light stain',fish:'fishable'},{max:20,c:'b',name:'Stained',fish:'poor fishing'},{max:Infinity,c:'b',name:'Muddy',fish:'very poor fishing'}];
+const turbBand=v=>TURB_BANDS.find(b=>v<b.max);
 const SITES={dam:'02334430',settles:'02334653',med:'02335000',atl:'02336000'};
 const H=3600e3;
 // Timing measured from 41 releases (medians)
@@ -412,7 +419,7 @@ function render(S){
   let phase='low', lines=[], status='';
   const LP=launch(), p=prof(LP.km), atMed=LP.id==='medlock', where=atMed?'Medlock':LP.name;
   if(e){
-    const on=e.on, off=e.off;
+    const on=e.on, off=e.off, p=relProf(LP.km,e);
     const rise=new Date(+on+p.rise*H), peak=new Date(+on+p.peak*H);
     if(!off){
       phase = now<rise?'incoming':'rising';
@@ -454,10 +461,10 @@ function render(S){
     rising:()=>add('b','Water is rising now. Not safe for wading.',45),
     high:()=>add('b','High release water. Boat or bank only. Fish slow edges and eddies.',35),
     falling:()=>add('b','Water still dropping after a release. Receding water runs stained and usually fishes poorly.',30)})[phase]();
-  if(tu){ if(tu.v<5) add('g',`Clear water (${tu.v} FNU). Go light and natural.`,0);
-    else if(tu.v<15) add('w',`Lightly stained (${tu.v} FNU). Use bigger, brighter patterns.`,8);
-    else if(tu.v<40) add('w',`Stained (${tu.v} FNU). Streamers and worms work best.`,20);
-    else add('b',`Muddy (${tu.v} FNU). Poor visibility, likely runoff.`,35); }
+  if(tu){ if(tu.v<5) add('g',`Clear water (${tu.v} FNU): good fishing. Go light and natural.`,0);
+    else if(tu.v<10) add('w',`Light stain (${tu.v} FNU): fishable. Use bigger, brighter patterns.`,10);
+    else if(tu.v<20) add('b',`Stained (${tu.v} FNU): poor fishing. Streamers and worms work best.`,25);
+    else add('b',`Muddy (${tu.v} FNU): very poor fishing. Likely runoff.`,40); }
   if(ec){ if(ec.v<235) add('g',`E. coli estimate ${ec.v}/100 mL, under the 235 swimming limit.`,0);
     else if(ec.v<1000) add('w',`E. coli estimate ${ec.v}/100 mL, over 235. Limit skin contact, wash hands.`,10);
     else add('b',`E. coli estimate ${ec.v}/100 mL. Avoid contact with the water.`,25); }
@@ -477,7 +484,7 @@ function render(S){
   const tile=(k,v,u,cls,s)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}<small> ${u}</small></div><div class="s"><i class="dot ${cls}"></i>${s}</div></div>`;
   $('tiles').innerHTML=[
     tile('Medlock stage',st?st.v.toFixed(2):'–','ft',phase==='low'?'g':phase==='falling'||phase==='incoming'?'w':'b',q?Math.round(q.v).toLocaleString()+' cfs':''),
-    tile('Turbidity',tu?tu.v:'–','FNU',!tu?'':tu.v<5?'g':tu.v<40?'w':'b',!tu?'':tu.v<5?'Clear':tu.v<15?'Light stain':tu.v<40?'Stained':'Muddy'),
+    tile('Turbidity',tu?tu.v:'–','FNU',!tu?'':turbBand(tu.v).c,!tu?'':turbBand(tu.v).name),
     tile('E. coli est.',ec?ec.v:'–','/100mL',!ec?'':ec.v<235?'g':ec.v<1000?'w':'b',!ec?'':ec.v<235?'Under 235':'Over 235'),
     tile('Water temp',tempF!=null?tempF.toFixed(0):'–','°F',tempF==null?'':tempF<=65&&tempF>=45?'g':tempF>68?'b':'w',dq?'Dam '+Math.round(dq.v).toLocaleString()+' cfs':'')
   ].join('');
@@ -568,7 +575,7 @@ function renderMap(ctx,o={}){
   const rowY=r=>r<rowsU?T+r*rhU:T+hU+gap+(r-rowsU)*rhL, rowH=r=>r<rowsU?rhU:rhL;
   const rowKm=r=>r<rowsU?k0+(r+0.5)*(kU-k0)/rowsU:kL+(r-rowsU+0.5)*(k1-kL)/rowsL;
   const cw=w/cols, rh=rhU, cells=[], X=t=>L+(t-t0)/(t1-t0)*w;
-  let g='';
+  let g=`<defs><pattern id="hStain" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.6" height="6" fill="#7a4a1c" opacity=".55"/></pattern><pattern id="hMud" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="4" fill="#5a3410" opacity=".75"/></pattern></defs>`;
   for(let r=0;r<rows;r++){
     const km=rowKm(r);
     for(let c=0;c<cols;c++){
@@ -578,6 +585,7 @@ function renderMap(ctx,o={}){
         fill= st==='high'?'var(--river)': (st==='caution'||st==='falling')?'color-mix(in srgb,var(--river) 45%,var(--panel))': heat(q); }
       cells.push({r,c,km,t,st,q,s:f&&f.s});
       g+=`<rect x="${(L+c*cw).toFixed(1)}" y="${rowY(r).toFixed(1)}" width="${(cw+0.4).toFixed(1)}" height="${(rowH(r)+0.4).toFixed(1)}" fill="${fill}"/>`;
+      if(f&&f.s&&f.s.turb!=null&&f.s.turb>=10) g+=`<rect x="${(L+c*cw).toFixed(1)}" y="${rowY(r).toFixed(1)}" width="${(cw+0.4).toFixed(1)}" height="${(rowH(r)+0.4).toFixed(1)}" fill="url(#${f.s.turb>=20?'hMud':'hStain'})"/>`;
     }
   }
   const marked=o.ramps||[TRIP.launch];
@@ -630,7 +638,7 @@ function mapHover(ev){
   const label={high:'Release water: high and fast',caution:'Water rising',falling:'Falling back after a release',low:'Low, normal water'}[cell.st]||'No data';
   const s=cell.s||{};
   $(M.read).innerHTML=`<div class="t">${fmtT(new Date(cell.t))}, ${where}</div><div>${label}${cell.q!=null?` · score <b>${cell.q}</b>`:''}</div>`+
-    (s.turb!=null?`<div>Turbidity <b>${s.turb} FNU</b> · E. coli <b>${s.ec??'–'}</b>${s.tf!=null?` · <b>${s.tf.toFixed(0)}°F</b>`:''}</div>`:'');
+    (s.turb!=null?`<div>Turbidity <b>${s.turb} FNU</b> (${turbBand(s.turb).name.toLowerCase()}) · E. coli <b>${s.ec??'–'}</b>${s.tf!=null?` · <b>${s.tf.toFixed(0)}°F</b>`:''}</div>`:'');
   $(M.read).hidden=false;
 }
 for(const id of ['rmap','dmap']){ $(id).addEventListener('pointermove',mapHover); $(id).addEventListener('pointerdown',mapHover); }
@@ -642,7 +650,7 @@ function simulateDrift(from,to,T,ctx){
     pts.push({t,km});
     if(r){ if(r.dark) dark=true; sum+=r.q; n++; }
     if(s){ const isHi=s.water==='high'||s.water==='caution'; if(isHi) hi++; if(isHi&&prev===false&&!hit) hit={t,km}; prev=isHi;
-      if(s.turb!=null&&s.turb>=15) muddy=true; if(s.ec!=null&&s.ec>=235) ecHi=true; }
+      if(s.turb!=null&&s.turb>=10) muddy=true; if(s.ec!=null&&s.ec>=235) ecHi=true; }
     km+=driftKmh(km,s?s.water:null)*step/H; t+=step;
   }
   pts.push({t,km:Math.min(km,to.km)});
@@ -675,7 +683,7 @@ function driftPage(){
   if(r.hit) N.push(['w',`Release water catches you about ${fmtT(new Date(r.hit.t))}, ${(r.hit.km/1.609).toFixed(1)} mi below the dam. Your drift speeds up and the water stains.`]);
   if(!r.hit&&r.hiShare>=0.25) N.push(['b',`You’d be on release water for ${Math.round(r.hiShare*100)}% of the drift.`]);
   if(r.dark&&r.hours<=light) N.push(['w','The drift runs outside legal fishing hours (30 min before sunrise to 30 min after sunset).']);
-  if(r.muddy) N.push(['w','Stained water (15+ FNU) for part of the drift.']);
+  if(r.muddy) N.push(['w','Stained water (10+ FNU, poor fishing) for part of the drift.']);
   if(r.ecHi) N.push(['w','E. coli estimate over 235 for part of the drift. Limit skin contact.']);
   if(to.id==='overlook') N.push(['w','The last stretch into Morgan Falls is slow reservoir water, so expect a longer drift than shown.']);
   if(!N.length) N.push(['g','Clean drift: no release water, clear water, inside legal hours.']);
@@ -849,6 +857,50 @@ const PROFILE=[
   // Below Morgan Falls Dam, Georgia Power re-times the water. Only loosely tied to Buford (7-11 matched releases).
   {km:59.1,rise:16.5,peak:19.8,wade:17.1,settle:17.8, ft:0.8},  // 02335815 below Morgan Falls Dam
   {km:75.0,rise:17.5,peak:24.0,wade:23.6,settle:25.5, ft:1.0}]; // 02336000 at Atlanta (Paces Ferry)
+// ---- Release size: how release length changes the rise, the recession and the stain ----
+// Measured at Medlock from 300 dry releases (Nov 2023 to Nov 2026, USGS 15-min data). Times are hours after the dam
+// shuts off. wade: within 0.8 ft of the pre-release level; settle: within 0.3 ft; fnu: added turbidity at its peak;
+// clear: turbidity back within 1 FNU of the pre-release level. PROFILE above matches a typical 2-3 h release.
+const REL_FIT=[
+  {d:1.5,ft:1.1,wade:10.0,settle:13.8,fnu:1.8, clear:10.6},
+  {d:2.5,ft:1.8,wade:11.8,settle:15.2,fnu:6.0, clear:13.5},
+  {d:3.5,ft:3.0,wade:12.9,settle:16.1,fnu:10.8,clear:12.5},
+  {d:5.0,ft:3.7,wade:13.0,settle:15.8,fnu:10.3,clear:9.5},
+  {d:8.0,ft:5.8,wade:13.5,settle:16.0,fnu:11.0,clear:8.0}];
+// Turbidity multipliers: two turbines stain about 1.6x one; fall releases stain most, winter least
+const TURB_SEASON=[0.6,0.6,0.9,0.9,0.9,1.1,1.1,1.1,1.3,1.3,1.3,0.6];
+const RSZ=new WeakMap();
+function relSize(r){
+  if(RSZ.has(r)) return RSZ.get(r);
+  const on=+r.on, off=+relOff(r), d=Math.max(0.5,(off-on)/H), F=REL_FIT;
+  let a=F[0], b=F[0], f=0;
+  if(d>=F[F.length-1].d){a=b=F[F.length-1]} else if(d>F[0].d){ const i=F.findIndex(x=>x.d>=d); a=F[i-1]; b=F[i]; f=(d-a.d)/(b.d-a.d); }
+  const L=k=>a[k]+(b[k]-a[k])*f;
+  // Turbines: Corps megawatts if scheduled, else the dam gauge's peak flow (one unit is about 5,000 cfs / 60 MW)
+  let two=null;
+  if(r.mw) two=r.mw>=90;
+  else if(typeof LAST!=='undefined'&&LAST){ const dam=(LAST.S[SITES.dam+':00060']||[]).filter(x=>+x.t>=on&&+x.t<=off+0.5*H); if(dam.length) two=Math.max(...dam.map(x=>x.v))>=7000; }
+  const fall=[8,9,10].includes(new Date(on).getMonth());
+  const o={d, ft:L('ft'), wadeK:L('wade')/11.8*(fall?1.07:1), settleK:L('settle')/15.0*(fall?1.07:1),
+    fnu:L('fnu')*(two===true?1.6:two===false?0.9:1)*TURB_SEASON[new Date(on).getMonth()], clear:L('clear')*(fall?1.07:1), two};
+  RSZ.set(r,o); return o;
+}
+// Release timing at km for release r, scaled by its size
+function relProf(km,r){
+  const p=prof(km); if(!r||km>=59) return p;
+  const z=relSize(r); p.wade*=z.wadeK; p.settle*=z.settleK; p.ft*=z.ft/2.1; return p;
+}
+// Turbidity a release adds at km and time t (FNU). Stain arrives about an hour after the rise, peaks with the
+// stage, then fades until it's back within 1 FNU. Receding water stays well stained on the river (Nate's
+// experience), so while it's still falling keep at least half the peak stain.
+function relTurb(r,km,t,water){
+  const z=relSize(r), p=relProf(km,r), on=+r.on, off=+relOff(r), A=z.fnu;
+  const t0=on+(p.rise+1)*H, tp=Math.max(on+p.peak*H,t0+0.5*H), tc=Math.max(off+z.clear*(prof(km).settle/15)*H,tp+H);
+  let a=0;
+  if(t>t0&&t<=tp) a=A*(t-t0)/(tp-t0); else if(t>tp&&t<tc) a=A*Math.pow((tc-t)/(tc-tp),1.5);
+  if(water==='falling') a=Math.max(a,0.5*A);
+  return a;
+}
 function prof(km){
   const P=PROFILE; if(km<=P[0].km) return {...P[0]}; if(km>=P[P.length-1].km) return {...P[P.length-1]};
   const i=P.findIndex(p=>p.km>=km), a=P[i-1], b=P[i], f=(km-a.km)/(b.km-a.km), o={km};
@@ -920,10 +972,10 @@ function stateAt(km,t,ctx){
     const u=mfUnits(t-(km-59.1)*0.18*H); water=u>=2?'high':u===1?'falling':'low';
   } else {
     for(const r of rel){
-      const on=+r.on, off=+relOff(r);
-      if(t>=on+(p.rise+0.5)*H && t<off+Math.max(p.wade,0.25)*H){water='high';break}
-      if(t>=on+p.rise*H && t<on+(p.rise+0.5)*H) water='caution';
-      else if(water==='low' && t>=off+p.wade*H && t<off+p.settle*H) water='falling';
+      const on=+r.on, off=+relOff(r), q=relProf(km,r);
+      if(t>=on+(q.rise+0.5)*H && t<off+Math.max(q.wade,0.25)*H){water='high';break}
+      if(t>=on+q.rise*H && t<on+(q.rise+0.5)*H) water='caution';
+      else if(water==='low' && t>=off+q.wade*H && t<off+q.settle*H) water='falling';
     }
   }
   // Clarity, E. coli and temperature are only measured at Medlock. Upstream, the same water reaches
@@ -938,11 +990,17 @@ function stateAt(km,t,ctx){
   // and the E. coli estimate (derived from turbidity) rises about 60%. Past hours use what was actually measured.
   // Future low-water hours: use the river's typical clear-water reading from the last 2 days
   // (25th percentile), not whatever a passing release is doing right now.
-  if(tq>=+now && t>+now && water==='low'){
+  if(tq>=+now && t>+now && (water==='low'||!lower)){
     const base=k=>{const a=(S[gauge+':'+k]||[]).filter(p=>+p.t>+now-48*H).map(p=>p.v); return a.length?pct(a,0.25):null};
     const bt=base('63680'), be=base('99407'); if(bt!=null) turb=bt; if(be!=null) ec=be;
   }
-  if(tq>=+now && t>+now && water!=='low'){
+  // Above Morgan Falls: add each release's modeled stain (size, turbines, season) on top of the clear-water level
+  if(tq>=+now && t>+now && !lower){
+    let add=0; for(const r of rel) if(t>+r.on && t<+relOff(r)+30*H) add+=relTurb(r,km,t,water);
+    if(turb!=null) turb=Math.round((turb+add)*10)/10;
+    if(ec!=null) ec=Math.round(ec*(1+0.075*add));
+  }
+  if(tq>=+now && t>+now && water!=='low' && lower){
     // Receding water stays muddy: on the river, the drop-out after a release fishes about as badly as the high water
     const hi=water==='high'||water==='falling';
     if(turb!=null) turb=Math.round((turb+(hi?8:4))*10)/10;
@@ -975,7 +1033,7 @@ function fishQ(t,km,ctx,sunT){
   if(t<+sunT.rise-30*60e3||t>+sunT.set+30*60e3) return {q:0,dark:true};
   const s=stateAt(km,t,ctx); if(!s) return null;
   let q = s.water==='low'?60 : s.water==='falling'?25 : s.water==='caution'?40 : 15;
-  if(s.turb!=null) q+= s.turb<5?15: s.turb<15?5: s.turb<40?-15:-40;
+  if(s.turb!=null) q+= s.turb<5?15: s.turb<10?0: s.turb<20?-20:-40;
   if(s.tf!=null) q+= s.tf>68?-40: s.tf>65?-10: s.tf<45?-10:5;
   if(s.ec!=null && s.ec>=235) q-=10;
   if((t>=+sunT.rise-30*60e3&&t<=+sunT.rise+2*H)||(t>=+sunT.set-2*H&&t<=+sunT.set+30*60e3)) q+=20;
@@ -999,7 +1057,7 @@ function wadeScore(T,ctx,sunT){
     let q=r.q;
     if(r.s){ const hi=r.s.water==='high'||r.s.water==='caution';
       if(hi){ q=0; if(prev===null) flags.startHigh=true; else if(prev===false&&!flags.rise) flags.rise={t,into:(t-T)/H}; }
-      prev=hi; if(r.s.turb!=null&&r.s.turb>=15) flags.muddy=true; }
+      prev=hi; if(r.s.turb!=null&&r.s.turb>=10) flags.muddy=true; }
     sum+=q;n++;
   }
   if(!n) return {score:null};
@@ -1017,7 +1075,7 @@ function driftScore(T,ctx,sunT){
       if(r.dark) flags.afterDark=true;
       if(r.s){ const hi=r.s.water==='high'||r.s.water==='caution'; if(hi) flags.hiN=(flags.hiN||0)+1;
         if(hi && prev===false && !flags.releaseHit) flags.releaseHit={t,into:(t-T)/H};
-        prev=hi; if(r.s.turb!=null&&r.s.turb>=15) flags.muddy=true; }
+        prev=hi; if(r.s.turb!=null&&r.s.turb>=10) flags.muddy=true; }
       sum+=r.q;n++;
     }
     km+=driftKmh(km,r&&r.s?r.s.water:null)*step/H; t+=step;
@@ -1047,7 +1105,7 @@ function tripScore(T,ctx,sunT){
     if(r.dark) flags.afterDark=true;
     if(r.s){ const hi=r.s.water==='high'||r.s.water==='caution'; if(hi) flags.hiN=(flags.hiN||0)+1;
       if(hi && prev===false && !flags.releaseHit) flags.releaseHit={t,into:(t-P.fStart)/H};
-      prev=hi; if(r.s.turb!=null&&r.s.turb>=15) flags.muddy=true; }
+      prev=hi; if(r.s.turb!=null&&r.s.turb>=10) flags.muddy=true; }
     sum+=r.q;n++;
   }
   if(P.end>+sunT.set+30*60e3) flags.afterDark=true;
@@ -1114,9 +1172,9 @@ function renderClosed(T,sunT,L,projected){
 function releaseFor(ctx,T){
   const L=launch(), P=tripPath(T), kms=[L.km,P.turn??L.km], end=P.end||T+(TRIP.float||3)*H;
   const rel=[...ctx.rel].sort((a,b)=>a.on-b.on);
-  const near=Math.min(...kms.map(k=>prof(k).rise)), far=Math.max(...kms.map(k=>prof(k).settle));
+  const near=Math.min(...kms.map(k=>prof(k).rise));
   let cur=null, next=null;
-  for(const r of rel){ const off=+relOff(r);
+  for(const r of rel){ const off=+relOff(r), far=Math.max(...kms.map(k=>relProf(k,r).settle));
     if(+r.on+near*H<=T && off+far*H>T) cur=r;
     else if(+r.on+near*H>T && !next) next=r; }
   return cur||(next&&+next.on+near*H<end+6*H?next:null)||next;
@@ -1140,7 +1198,7 @@ function projTimeline(ctx,T){
   const L=launch(), r=releaseFor(ctx,T), when=new Date(T), day=d=>d.toDateString()!==when.toDateString()?d.toLocaleDateString([], {weekday:'short'})+' · ':'';
   const rel=t=>{const d=(t-T)/H; return Math.abs(d)<0.1?'at launch':d<0?`${(-d).toFixed(1)} h before you launch`:`${d.toFixed(1)} h after you launch`};
   if(!r){ setProjRel(`${T<Date.now()?'Looking back at':'Projected for'} ${when.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(when)}: no release reaches ${L.name} around your trip.`); $('timeline').innerHTML=''; return null; }
-  const on=new Date(r.on), off=relOff(r), p=prof(L.km), P=tripPath(T);
+  const on=new Date(r.on), off=relOff(r), p=relProf(L.km,r), P=tripPath(T);
   const src=r.src==='sched'?'Corps schedule':'dam gauge';
   setProjRel(`Release ${day(on)}${fmtT(on)} to ${fmtT(off)} (${((off-on)/H).toFixed(1)} h, ${src}).`);
   const lines=[[on,'Dam opens'],[off,'Dam shuts off']];
@@ -1168,7 +1226,7 @@ function renderProjected(ctx,T){
   const R=[], pr=projTimeline(ctx,T);
   if(pr) R.push(['w',`${pr.r.src==='sched'?'Scheduled release':'Release'} ${fmtT(pr.on)}–${fmtT(pr.off)}${pr.on.toDateString()!==new Date(T).toDateString()?' '+pr.on.toLocaleDateString([], {weekday:'short'}):''}: water rises at ${SHORT[L.id]||L.name} about ${fmtT(pr.rise)}, wadeable again about ${fmtT(pr.wade)}.`]);
   if(water) R.push([st.water==='low'?'g':(st.water==='high'||st.water==='falling')?'b':'w',water]);
-  if(st&&st.turb!=null) R.push([st.turb<5?'g':st.turb<15?'w':'b',`Turbidity about ${st.turb} FNU (${pj}).`]);
+  if(st&&st.turb!=null) R.push([turbBand(st.turb).c,`Turbidity about ${st.turb} FNU (${pj}): ${turbBand(st.turb).name.toLowerCase()}, ${turbBand(st.turb).fish}.`]);
   if(st&&st.ec!=null) R.push([st.ec<235?'g':'b',`E. coli estimate about ${st.ec}/100 mL (${pj}).`]);
   if(st&&st.tf!=null) R.push([st.tf>=45&&st.tf<=65?'g':'w',`Water about ${st.tf.toFixed(0)}°F.`]);
   R.push(['w',`Sunrise ${fmtT(sunT.rise)}, sunset ${fmtT(sunT.set)}.`]);

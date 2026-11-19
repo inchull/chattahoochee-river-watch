@@ -1230,7 +1230,8 @@ function renderProjected(ctx,T){
   if(closedAt(T,sunT)){ projTimeline(ctx,T); return renderClosed(T,sunT,L,true); }
   const tr=tripScore(T,ctx,sunT), f=fishQ(T,L.km,ctx,sunT), st=stateAt(L.km,T,ctx);
   const cond=f&&!f.dark?f.q:0;
-  const score=tr.score==null?cond:Math.round(0.35*cond+0.65*tr.score);
+  // The trip score already samples conditions across the whole outing, so it is the score
+  const score=tr.score==null?cond:tr.score;
   const col=score>=75?'var(--good)':score>=50?'var(--warn)':'var(--bad)';
   $('score').style.borderColor=col; $('score').innerHTML=score+'<span>SCORE</span>';
   const verb=TRIP.boat==='wade'?'wade':'launch', when=`${new Date(T).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(new Date(T))}`;
@@ -1315,7 +1316,7 @@ function renderVerdict(ctx){
   const {now,condScore,R,phaseTxt}=LAST; const sunT=sun(now);
   if(closedAt(+now,sunT)) return renderClosed(+now,sunT,launch(),false);
   const tr=tripScore(+now,ctx,sunT);
-  const score=tr.score==null?condScore:Math.round(0.35*condScore+0.65*tr.score);
+  const score=tr.score==null?condScore:tr.score;
   const col=score>=75?'var(--good)':score>=50?'var(--warn)':'var(--bad)';
   $('score').style.borderColor=col; $('score').innerHTML=score+'<span>SCORE</span>';
   const verb=TRIP.boat==='wade'?'wade':'launch';
@@ -1349,12 +1350,12 @@ function dayRow(d,ctx,{isToday,future,meta}){
 
 
 // ---- Best time to fish: search every 15 min from now to the end of the posted schedule ----
-// Same score as the main card: conditions at the ramp at launch (35%) and the whole trip (65%). Water level,
+// Same score as the main card: conditions sampled across the whole trip. Water level,
 // turbidity, and every release in the 24 h before and after (measured, or from the Corps schedule) are in it.
 function fullScore(T,ctx){
   const sunT=sun(new Date(T)); if(closedAt(T,sunT)) return null;
   const tr=tripScore(T,ctx,sunT), f=fishQ(T,launch().km,ctx,sunT), cond=f&&!f.dark?f.q:0;
-  return {T, score:tr.score==null?cond:Math.round(0.35*cond+0.65*tr.score), tr, st:f&&f.s};
+  return {T, score:tr.score==null?cond:tr.score, tr, st:f&&f.s};
 }
 function renderBest(ctx){
   const L=launch(), step=15*60e3, now=Date.now(), h=+horizon(L);

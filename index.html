@@ -417,7 +417,10 @@ function render(S){
     if(!off){
       phase = now<rise?'incoming':'rising';
       status=`Dam is generating now (${Math.round(dq.v).toLocaleString()} cfs since ${fmtT(on)}).`;
-      lines=[[on,'Dam opened'],[rise,`Water starts rising at ${where}`],[peak,`${where} near peak (about +${p.ft.toFixed(1)} ft)`],[null,`Wadeable again about ${p.wade.toFixed(1)} h after the dam shuts off`]];
+      const po=projOff(on);
+      if(po){ const pw=new Date(+po+p.wade*H), pn=new Date(+po+p.settle*H);
+        lines=[[on,'Dam opened'],[po,'Dam scheduled to shut off (Corps schedule)'],[rise,`Water starts rising at ${where}`],[peak,`${where} near peak (about +${p.ft.toFixed(1)} ft)`],[pw,'Wadeable again (projected)'],[pn,'Back to normal low water (projected)']];
+      } else lines=[[on,'Dam opened'],[rise,`Water starts rising at ${where}`],[peak,`${where} near peak (about +${p.ft.toFixed(1)} ft)`],[null,`Wadeable again about ${p.wade.toFixed(1)} h after the dam shuts off`]];
     } else {
       const wade=new Date(+off+p.wade*H), normal=new Date(+off+p.settle*H);
       if(now<rise) phase='incoming'; else if(now<wade) phase='high'; else if(now<normal) phase='falling'; else phase='low';
@@ -808,6 +811,12 @@ function mfUnits(t){
   }
   return best && t-best.ts<36*H ? best.u : null;
 }
+// Projected shutoff for a release the dam gauge shows as still running: the matching Corps schedule block's
+// length, counted from the measured start (the gauge lags the schedule's hour marks), never earlier than the block's end.
+function projOff(on){
+  const x=schedReleases().find(x=>+x.on<=+on+2*H && +x.off>+on-H); if(!x) return null;
+  return new Date(Math.max(+x.off, +on+(x.off-x.on)));
+}
 function schedReleases(){
   // Contiguous hours at >= 20 MW are a release (minimum flow runs 4-7 MW)
   const out=[]; if(!SCHED) return out;
@@ -1116,8 +1125,8 @@ function todayReleases(ctx){
   if(!list.length) return (SCHED&&SCHED.days[k])?'No release today.':'Today’s release schedule isn’t posted yet.';
   const one=r=>{const on=+r.on, off=r.off?+r.off:null;
     if(!off){ // running now per the dam gauge: take the end time from the Corps schedule
-      const s=schedReleases().find(x=>+x.on<=on+2*H && +x.off>on-H);
-      return s?`${fmtT(new Date(on))} to about ${fmtT(s.off)} (${+s.off>now?'running now':'should be shutting off; dam gauge not updated yet'})`
+      const po=projOff(on);
+      return po?`${fmtT(new Date(on))} to about ${fmtT(po)} (${+po>now?'running now':'should be shutting off; dam gauge not updated yet'})`
               :`${fmtT(new Date(on))}, running now (end time not posted)`; }
     const st=off<=now?'ran':on<=now?'running now':'scheduled';
     return `${fmtT(new Date(on))} to ${fmtT(new Date(off))} (${st})`;};
@@ -1368,8 +1377,8 @@ whenControls();
 driftControls();
 route();
 window.addEventListener('hashchange',()=>{route();window.scrollTo(0,0)});
-$('refresh').addEventListener('click',()=>{loadSchedule().then(renderWindows);load(true)});
-loadSchedule().then(renderWindows);
+$('refresh').addEventListener('click',()=>{loadSchedule().then(()=>LAST?render(LAST.S):renderWindows());load(true)});
+loadSchedule().then(()=>LAST?render(LAST.S):renderWindows());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden) load()});
 setInterval(()=>{if(!document.hidden) load()},10*60e3);
 load();

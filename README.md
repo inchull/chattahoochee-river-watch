@@ -1,4 +1,4 @@
-# Hoo-Watch
+# Hooch Watch
 
 Phone-friendly page for planning trout trips on the Chattahoochee below Buford Dam, from Buford Dam down to Medlock Bridge. It shows:
 

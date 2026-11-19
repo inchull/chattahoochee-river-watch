@@ -817,6 +817,8 @@ function projOff(on){
   const x=schedReleases().find(x=>+x.on<=+on+2*H && +x.off>+on-H); if(!x) return null;
   return new Date(Math.max(+x.off, +on+(x.off-x.on)));
 }
+// End of a release: measured, else projected from the Corps schedule, else a typical 2.5 h
+const relOff=r=>r.off?new Date(r.off):(projOff(r.on)||new Date(+r.on+2.5*H));
 function schedReleases(){
   // Contiguous hours at >= 20 MW are a release (minimum flow runs 4-7 MW)
   const out=[]; if(!SCHED) return out;
@@ -918,7 +920,7 @@ function stateAt(km,t,ctx){
     const u=mfUnits(t-(km-59.1)*0.18*H); water=u>=2?'high':u===1?'falling':'low';
   } else {
     for(const r of rel){
-      const on=+r.on, off=+(r.off||new Date(on+2.5*H));
+      const on=+r.on, off=+relOff(r);
       if(t>=on+(p.rise+0.5)*H && t<off+Math.max(p.wade,0.25)*H){water='high';break}
       if(t>=on+p.rise*H && t<on+(p.rise+0.5)*H) water='caution';
       else if(water==='low' && t>=off+p.wade*H && t<off+p.settle*H) water='falling';
@@ -1113,7 +1115,7 @@ function releaseFor(ctx,T){
   const rel=[...ctx.rel].sort((a,b)=>a.on-b.on);
   const near=Math.min(...kms.map(k=>prof(k).rise)), far=Math.max(...kms.map(k=>prof(k).settle));
   let cur=null, next=null;
-  for(const r of rel){ const off=+(r.off||new Date(+r.on+2.5*H));
+  for(const r of rel){ const off=+relOff(r);
     if(+r.on+near*H<=T && off+far*H>T) cur=r;
     else if(+r.on+near*H>T && !next) next=r; }
   return cur||(next&&+next.on+near*H<end+6*H?next:null)||next;
@@ -1137,7 +1139,7 @@ function projTimeline(ctx,T){
   const L=launch(), r=releaseFor(ctx,T), when=new Date(T), day=d=>d.toDateString()!==when.toDateString()?d.toLocaleDateString([], {weekday:'short'})+' · ':'';
   const rel=t=>{const d=(t-T)/H; return Math.abs(d)<0.1?'at launch':d<0?`${(-d).toFixed(1)} h before you launch`:`${d.toFixed(1)} h after you launch`};
   if(!r){ setProjRel(`${T<Date.now()?'Looking back at':'Projected for'} ${when.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(when)}: no release reaches ${L.name} around your trip.`); $('timeline').innerHTML=''; return null; }
-  const on=new Date(r.on), off=new Date(r.off||+r.on+2.5*H), p=prof(L.km), P=tripPath(T);
+  const on=new Date(r.on), off=relOff(r), p=prof(L.km), P=tripPath(T);
   const src=r.src==='sched'?'Corps schedule':'dam gauge';
   setProjRel(`Release ${day(on)}${fmtT(on)} to ${fmtT(off)} (${((off-on)/H).toFixed(1)} h, ${src}).`);
   const lines=[[on,'Dam opens'],[off,'Dam shuts off']];

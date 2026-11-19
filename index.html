@@ -453,7 +453,7 @@ function render(S){
     incoming:()=>{const r=new Date(+e.on+p.rise*H);add('w',`Release on the way. Rise reaches ${where} about ${fmtT(r)}. Fish the hour before it, then get out.`,10)},
     rising:()=>add('b','Water is rising now. Not safe for wading.',45),
     high:()=>add('b','High release water. Boat or bank only. Fish slow edges and eddies.',35),
-    falling:()=>add('w','Water falling after a release. Fish often feed as it drops.',5)})[phase]();
+    falling:()=>add('b','Water still dropping after a release. Receding water runs stained and usually fishes poorly.',30)})[phase]();
   if(tu){ if(tu.v<5) add('g',`Clear water (${tu.v} FNU). Go light and natural.`,0);
     else if(tu.v<15) add('w',`Lightly stained (${tu.v} FNU). Use bigger, brighter patterns.`,8);
     else if(tu.v<40) add('w',`Stained (${tu.v} FNU). Streamers and worms work best.`,20);
@@ -910,7 +910,7 @@ function stateAt(km,t,ctx){
   const st=S[SITES.med+':00065']||[], lower=km>=59, atl=S[SITES.atl+':00065']||[];
   if(Math.abs(km-MED_KM)<0.5 && t<=+now){
     const v=valAt(st,t); if(v==null) return null;
-    water = v<=base+0.5?'low': v<=base+0.8?'falling':'high';
+    water = v<=base+0.3?'low': v<=base+0.8?'falling':'high';
   } else if(lower && t<=+now && ctx.baseAtl!=null){
     // Below Morgan Falls Dam: use what the Atlanta gauge actually measured (Morgan Falls re-times releases)
     const v=valAt(atl,t+(PROFILE[PROFILE.length-1].rise-p.rise)*H) ?? valAt(atl,t); if(v==null) return null;
@@ -943,7 +943,8 @@ function stateAt(km,t,ctx){
     const bt=base('63680'), be=base('99407'); if(bt!=null) turb=bt; if(be!=null) ec=be;
   }
   if(tq>=+now && t>+now && water!=='low'){
-    const hi=water==='high';
+    // Receding water stays muddy: on the river, the drop-out after a release fishes about as badly as the high water
+    const hi=water==='high'||water==='falling';
     if(turb!=null) turb=Math.round((turb+(hi?8:4))*10)/10;
     if(ec!=null) ec=Math.round(ec*(hi?1.6:1.3));
   }
@@ -973,7 +974,7 @@ function tripPath(T){
 function fishQ(t,km,ctx,sunT){
   if(t<+sunT.rise-30*60e3||t>+sunT.set+30*60e3) return {q:0,dark:true};
   const s=stateAt(km,t,ctx); if(!s) return null;
-  let q = s.water==='low'?60 : s.water==='falling'?55 : s.water==='caution'?40 : 15;
+  let q = s.water==='low'?60 : s.water==='falling'?25 : s.water==='caution'?40 : 15;
   if(s.turb!=null) q+= s.turb<5?15: s.turb<15?5: s.turb<40?-15:-40;
   if(s.tf!=null) q+= s.tf>68?-40: s.tf>65?-10: s.tf<45?-10:5;
   if(s.ec!=null && s.ec>=235) q-=10;
@@ -1162,11 +1163,11 @@ function renderProjected(ctx,T){
   const end=tr.fEnd?(tr.flags&&tr.flags.drift?` You’d reach ${tr.flags.to} about ${fmtT(new Date(tr.fEnd))}.`:` You’d be ${TRIP.boat==='wade'?'done':'back'} about ${fmtT(new Date(tr.fEnd))}.`):'';
   $('verdictSub').textContent=`${PJ} ${when} at ${L.name}.${end}`;
   const notes=tr.score==null?[]:tripNotes(tr);
-  if(tr.score!=null&&!notes.length) notes.push(['g','No release water reaches you on this trip.']);
-  const water={low:'Low, normal water at the ramp when you launch.',falling:'Water still dropping at the ramp when you launch.',caution:'Release water starting to arrive at the ramp as you launch.',high:'Release water at the ramp when you launch: high and fast.'}[st&&st.water]||'';
+  if(tr.score!=null&&!notes.length&&(!st||st.water==='low')) notes.push(['g','No release water reaches you on this trip.']);
+  const water={low:'Low, normal water at the ramp when you launch.',falling:'Water still dropping from a release when you launch. Receding water runs stained and usually fishes poorly.',caution:'Release water starting to arrive at the ramp as you launch.',high:'Release water at the ramp when you launch: high and fast.'}[st&&st.water]||'';
   const R=[], pr=projTimeline(ctx,T);
   if(pr) R.push(['w',`${pr.r.src==='sched'?'Scheduled release':'Release'} ${fmtT(pr.on)}–${fmtT(pr.off)}${pr.on.toDateString()!==new Date(T).toDateString()?' '+pr.on.toLocaleDateString([], {weekday:'short'}):''}: water rises at ${SHORT[L.id]||L.name} about ${fmtT(pr.rise)}, wadeable again about ${fmtT(pr.wade)}.`]);
-  if(water) R.push([st.water==='low'?'g':st.water==='high'?'b':'w',water]);
+  if(water) R.push([st.water==='low'?'g':(st.water==='high'||st.water==='falling')?'b':'w',water]);
   if(st&&st.turb!=null) R.push([st.turb<5?'g':st.turb<15?'w':'b',`Turbidity about ${st.turb} FNU (${pj}).`]);
   if(st&&st.ec!=null) R.push([st.ec<235?'g':'b',`E. coli estimate about ${st.ec}/100 mL (${pj}).`]);
   if(st&&st.tf!=null) R.push([st.tf>=45&&st.tf<=65?'g':'w',`Water about ${st.tf.toFixed(0)}°F.`]);

@@ -1058,6 +1058,13 @@ function tripPath(T,ctx=CUR_CTX){
   return {floatFirst:false, mStart:T, fStart:T+mot, fEnd:T+mot+fl, end:T+mot+fl,
     motorKm:f=>L.km-(L.km-turn)*f, floatKm:f=>turn+(L.km-turn)*f, turn};
 }
+// Midday dip: mornings and evenings fish best. Over the middle half of daylight (centered on solar noon) the score
+// eases down to its low at noon: -20 at the June solstice, -10 at the December solstice, smoothly in between.
+function middayDip(t,sunT){
+  const noon=(+sunT.rise+ +sunT.set)/2, half=(+sunT.set-+sunT.rise)/2, x=Math.abs(t-noon)/half; if(x>=0.75) return 0;
+  const d=new Date(t), doy=(d-new Date(d.getFullYear(),0,1))/864e5, max=15+5*Math.cos(2*Math.PI*(doy-172)/365.25);
+  return max*Math.pow(Math.cos(Math.PI/2*x/0.75),2);
+}
 function fishQ(t,km,ctx,sunT){
   if(t<+sunT.rise-30*60e3||t>+sunT.set+30*60e3) return {q:0,dark:true};
   const s=stateAt(km,t,ctx); if(!s) return null;
@@ -1068,7 +1075,7 @@ function fishQ(t,km,ctx,sunT){
   if(s.tf!=null) q+= s.tf>68?-40: s.tf>65?-10: s.tf<45?-10:5;
   if(s.ec!=null && s.ec>=235) q-=10;
     // Ideal conditions (low, clear at 3 FNU or under, 45-65°F, E. coli under 235) add up to 80; scale so they score 100
-    return {q:Math.round(Math.max(0,Math.min(100,q*1.25))),s};
+    return {q:Math.round(Math.max(0,Math.min(100,q*1.25-middayDip(t,sunT)))),s};
 }
 // Takeout for one-way drifts: the chosen ramp if it is downstream of the launch, else the next one
 // Default take-out: the next ramp downstream in the same pool that this boat can use
@@ -1426,7 +1433,7 @@ function renderBest(ctx){
     ${span?`<p class="status">${span.slice(2,-1).replace(/^./,c=>c.toUpperCase())}.</p>`:''}
     <ul class="bestWhy">${why.map(t=>`<li>${t}</li>`).join('')}</ul>
     ${alts.length?`<p class="foot">Other good times</p><div class="bestAlt">${alts.map(w=>`<button type="button" data-t="${w.best.T}">${dayLbl(w.best.T)} ${fmtT(new Date(w.best.T))} · ${w.best.score}</button>`).join('')}</div>`:''}
-    <p class="foot">Searched every 15 minutes from now through ${hd}, the end of the posted Corps schedule, for your ${TRIP.boat==='wade'?`${fmtDur(TRIP.float)} wading session`:`${fmtDur(TRIP.motor/60+TRIP.float)} trip (${TRIP.motor} min up, ${fmtDur(TRIP.float)} back)`}. Scores weigh water level, turbidity, temperature, light and every release before and after.</p>`;
+    <p class="foot">Searched every 15 minutes from now through ${hd}, the end of the posted Corps schedule, for your ${TRIP.boat==='wade'?`${fmtDur(TRIP.float)} wading session`:`${fmtDur(TRIP.motor/60+TRIP.float)} trip (${TRIP.motor} min up, ${fmtDur(TRIP.float)} back)`}. Scores weigh water level, turbidity, temperature, every release before and after, and time of day (midday scores a little lower, most in summer).</p>`;
   $('best').querySelectorAll('button[data-t]').forEach(x=>x.addEventListener('click',()=>{ FISH_AT=+x.dataset.t; showWhenMsg(''); syncWhen(); renderWindows(); document.querySelector('.verdict').scrollIntoView({behavior:'smooth'}); }));
 }
 function renderWindows(){

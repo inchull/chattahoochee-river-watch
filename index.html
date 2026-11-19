@@ -689,7 +689,7 @@ function driftPage(){
     tile('Drift time',r.hours>=24?`${Math.floor(r.hours/24)}d ${Math.round(r.hours%24)}h`:`${Math.floor(r.hours)}h ${String(Math.round((r.hours%1)*60)).padStart(2,'0')}m`,`${mi.toFixed(1)} river miles`),
     tile('Take out',(dayKey(new Date(r.end))!==dayKey(new Date(T))?new Date(r.end).toLocaleDateString([], {weekday:'short'})+' ':'')+fmtT(new Date(r.end)),to.name),
     tile('Release water',`${Math.round(r.hiShare*100)}%`,'of the drift'),
-    tile('Drift score',sc??'–',`<i class="dot ${sc>=65?'g':sc>=50?'w':'b'}"></i>${sc>=85?'Prime':sc>=65?'Good':sc>=50?'So-so':'Poor'}`)].join('');
+    tile('Drift score',sc??'–',`<i class="dot ${sc>=80?'g':sc>=60?'w':'b'}"></i>${sc>=90?'Prime':sc>=80?'Good':sc>=60?'So-so':'Poor'}`)].join('');
   const N=[];
   const light=(+sun(new Date(T)).set+30*60e3-T)/H;
   if(r.hours>light) N.push(['b',`About ${Math.round(r.hours)} h of drifting, more than the ${Math.max(0,light).toFixed(1)} h of legal fishing light left. Pick a closer take-out or start earlier.`]);
@@ -1061,7 +1061,8 @@ function fishQ(t,km,ctx,sunT){
   if(tq!=null) q+=tq;
   if(s.tf!=null) q+= s.tf>68?-40: s.tf>65?-10: s.tf<45?-10:5;
   if(s.ec!=null && s.ec>=235) q-=10;
-    return {q:Math.round(Math.max(0,Math.min(100,q))),s};
+    // Ideal conditions (low, clear at 3 FNU or under, 45-65°F, E. coli under 235) add up to 80; scale so they score 100
+    return {q:Math.round(Math.max(0,Math.min(100,q*1.25))),s};
 }
 // Takeout for one-way drifts: the chosen ramp if it is downstream of the launch, else the next one
 // Default take-out: the next ramp downstream in the same pool that this boat can use
@@ -1088,7 +1089,7 @@ function wadeScore(T,ctx,sunT){
   // Steer toward water people actually wade: not known for wading -20, limited -8
   const pen=L.wade==='not'?20:L.wade==='limited'?8:0; flags.wadeRating=L.wade;
   flags.fishH=n*step/H; flags.planH=dur/H; flags.close=+sunT.set+30*60e3;
-  return {score:Math.max(0,Math.round(sum/n)-pen),flags,fEnd:T+dur};
+  return {score:Math.max(0,Math.round(sum/n-pen*1.25)),flags,fEnd:T+dur};
 }
 function driftScore(T,ctx,sunT){
   const L=launch(), to=takeout(L), step=15*60e3;
@@ -1107,7 +1108,7 @@ function driftScore(T,ctx,sunT){
   }
   if(!n) return {score:null};
   flags.hours=(t-T)/H; flags.hiShare=(flags.hiN||0)/n; flags.fishH=n*step/H; flags.planH=flags.hours; flags.close=+sunT.set+30*60e3;
-  return {score:Math.max(0,Math.round(sum/n-(flags.releaseHit?10:0))),flags,fEnd:t};
+  return {score:Math.max(0,Math.round(sum/n-(flags.releaseHit?12.5:0))),flags,fEnd:t};
 }
 function tripScore(T,ctx,sunT){
   if(T<+sunT.rise-30*60e3||T>+sunT.set+30*60e3) return {score:null,dark:true};
@@ -1137,9 +1138,10 @@ function tripScore(T,ctx,sunT){
   if(!n) return {score:null};
   flags.hiShare=(flags.hiN||0)/n; flags.fishH=n*step/H; flags.planH=TRIP.float; flags.close=+sunT.set+30*60e3;
   if(flags.releaseHit) pen+=10;
-  return {score:Math.max(0,Math.round(sum/n-pen)),flags,fEnd:P.end};
+  return {score:Math.max(0,Math.round(sum/n-pen*1.25)),flags,fEnd:P.end};
 }
-const heat=sc=>sc==null?'var(--line)':sc>=50?`color-mix(in srgb,var(--good) ${Math.round((sc-50)/50*100)}%,var(--warn))`:`color-mix(in srgb,var(--warn) ${Math.round(sc/50*100)}%,var(--bad))`;
+// Colors: 60 = so-so (amber), 100 = ideal (green), 0 = poor (red)
+const heat=sc=>sc==null?'var(--line)':sc>=60?`color-mix(in srgb,var(--good) ${Math.round((sc-60)/40*100)}%,var(--warn))`:`color-mix(in srgb,var(--warn) ${Math.round(sc/60*100)}%,var(--bad))`;
 function dayWindows(day,ctx){
   const d0=new Date(day.getFullYear(),day.getMonth(),day.getDate()); const sunT=sun(d0);
   const slots=[];
@@ -1150,7 +1152,7 @@ function dayWindows(day,ctx){
   }
   const wins=[];let cur=null;
   for(const s of slots){
-    const cls=s.score==null?null:s.score>=85?'prime':s.score>=65?'good':null;
+    const cls=s.score==null?null:s.score>=90?'prime':s.score>=80?'good':null;
     if(cls){ if(cur&&cur.cls===cls){cur.end=s.t+SLOT;cur.best=Math.max(cur.best,s.score)} else {cur={cls,start:s.t,end:s.t+SLOT,best:s.score};wins.push(cur)} }
     else cur=null;
   }
@@ -1240,10 +1242,10 @@ function renderProjected(ctx,T){
   const cond=f&&!f.dark?f.q:0;
   // The trip score already samples conditions across the whole outing, so it is the score
   const score=tr.score==null?cond:tr.score;
-  const col=score>=75?'var(--good)':score>=50?'var(--warn)':'var(--bad)';
+  const col=score>=80?'var(--good)':score>=60?'var(--warn)':'var(--bad)';
   $('score').style.borderColor=col; $('score').innerHTML=score+'<span>SCORE</span>';
   const verb=TRIP.boat==='wade'?'wade':'launch', when=`${new Date(T).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'})} ${fmtT(new Date(T))}`;
-  $('verdict').textContent=tr.dark||(f&&f.dark)?'Outside fishing hours':score>=75?`Good time to ${verb}`:score>=50?(TRIP.boat==='wade'?'Fishable session':'Fishable trip'):`Poor time to ${verb}`;
+  $('verdict').textContent=tr.dark||(f&&f.dark)?'Outside fishing hours':score>=80?`Good time to ${verb}`:score>=60?(TRIP.boat==='wade'?'Fishable session':'Fishable trip'):`Poor time to ${verb}`;
   const end=tr.fEnd?(tr.flags&&tr.flags.drift?` You’d reach ${tr.flags.to} about ${fmtT(new Date(tr.fEnd))}.`:` You’d be ${TRIP.boat==='wade'?'done':'back'} about ${fmtT(new Date(tr.fEnd))}.`):'';
   $('verdictSub').textContent=`${PJ} ${when} at ${L.name}.${end}`;
   const notes=tr.score==null?[]:tripNotes(tr);
@@ -1325,10 +1327,10 @@ function renderVerdict(ctx){
   if(closedAt(+now,sunT)) return renderClosed(+now,sunT,launch(),false);
   const tr=tripScore(+now,ctx,sunT);
   const score=tr.score==null?condScore:tr.score;
-  const col=score>=75?'var(--good)':score>=50?'var(--warn)':'var(--bad)';
+  const col=score>=80?'var(--good)':score>=60?'var(--warn)':'var(--bad)';
   $('score').style.borderColor=col; $('score').innerHTML=score+'<span>SCORE</span>';
   const verb=TRIP.boat==='wade'?'wade':'launch';
-  $('verdict').textContent=tr.score==null?(score>=75?'Good to fish':score>=50?'Fishable':'Poor right now'):(score>=75?`Good time to ${verb}`:score>=50?(TRIP.boat==='wade'?'Fishable session':'Fishable trip'):`Poor time to ${verb}`);
+  $('verdict').textContent=tr.score==null?(score>=80?'Good to fish':score>=60?'Fishable':'Poor right now'):(score>=80?`Good time to ${verb}`:score>=60?(TRIP.boat==='wade'?'Fishable session':'Fishable trip'):`Poor time to ${verb}`);
   const back=!tr.fEnd?'':tr.flags&&tr.flags.wade?` Wade now and you’re done about ${fmtT(new Date(tr.fEnd))}.`:tr.flags&&tr.flags.drift?` Drift now and you reach ${tr.flags.to} about ${fmtT(new Date(tr.fEnd))} (${tr.flags.hours.toFixed(1)} h).`:` Launch now and you’re back about ${fmtT(new Date(tr.fEnd))}.`;
   $('verdictSub').textContent=phaseTxt+back;
   const notes=tr.score==null?[]:tripNotes(tr);
@@ -1360,7 +1362,7 @@ function dayRow(d,ctx,{isToday,future,meta}){
   const shown=isToday?wins.filter(w=>w.end>+ctx.now):wins;
   const best=slots.filter(s=>s.score!=null&&(!isToday||s.t+SLOT>+ctx.now)).sort((a,b)=>b.score-a.score)[0];
   const w=TRIP.boat==='wade'?'time to wade':'launch';
-  const bestTxt=best&&best.score>=50?`<span class="win none">So-so: ${TRIP.boat==='wade'?'wade':'launch'} ${fmtH(best.t)} (score ${best.score})</span>`:`<span class="win none">No good ${w} ${isToday?'left today':'this day'}</span>`;
+  const bestTxt=best&&best.score>=60?`<span class="win none">So-so: ${TRIP.boat==='wade'?'wade':'launch'} ${fmtH(best.t)} (score ${best.score})</span>`:`<span class="win none">No good ${w} ${isToday?'left today':'this day'}</span>`;
   return `<div class="day"><div class="d">${isToday?'Today':d.toLocaleDateString([], {weekday:'short'})}<small>${d.toLocaleDateString([], {month:'short',day:'numeric'})}</small></div><div>
     <div class="wins">${shown.map(winHTML).join('')||bestTxt}</div>
     ${stripHTML(slots,isToday?+ctx.now:-1)}
@@ -1393,7 +1395,7 @@ function renderBest(ctx){
   }
   wins.sort((a,b)=>b.best.score-a.best.score||a.start-b.start);
   const top=wins[0], b=top.best, dayLbl=t=>{const d=new Date(t); return dayKey(d)===dayKey(new Date())?'Today':d.toLocaleDateString([], {weekday:'long'})};
-  const col=x=>x>=75?'var(--good)':x>=50?'var(--warn)':'var(--bad)';
+  const col=x=>x>=80?'var(--good)':x>=60?'var(--warn)':'var(--bad)';
   const span=top.end>top.start?` (good from ${fmtT(new Date(top.start))} to ${fmtT(new Date(top.end))})`:'';
   // Why
   const why=[], st=b.st;
@@ -1406,7 +1408,7 @@ function renderBest(ctx){
   const before=relLine(b.T-24*H,b.T), after=relLine(b.T,b.T+24*H);
   why.push(`Releases in the 24 h before: ${before.length?before.join(', '):'none'}.`);
   why.push(`Releases in the 24 h after: ${after.length?after.join(', '):'none'}${b.T+24*H>h?`. The schedule is only posted through ${hd}`:''}.`);
-  const alts=wins.slice(1).filter(w=>w.best.score>=50&&(w.start>top.end+H||w.end<top.start-H)).slice(0,3);
+  const alts=wins.slice(1).filter(w=>w.best.score>=60&&(w.start>top.end+H||w.end<top.start-H)).slice(0,3);
   $('best').innerHTML=`<div class="bestTop"><span class="when">${dayLbl(b.T)} ${fmtT(new Date(b.T))}</span><span class="sc" style="background:${col(b.score)}">Score ${b.score}</span><button type="button" data-t="${b.T}">Plan this time</button></div>
     ${span?`<p class="status">${span.slice(2,-1).replace(/^./,c=>c.toUpperCase())}.</p>`:''}
     <ul class="bestWhy">${why.map(t=>`<li>${t}</li>`).join('')}</ul>

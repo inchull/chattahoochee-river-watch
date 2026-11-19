@@ -965,8 +965,11 @@ function driftKmh(km,water){
   return DRIFT_KMH[water||'low']*f;
 }
 const MED_KM=29.7;
-// Net upstream speed: a prop boat about 8 mph, a jet boat about 20 mph
-const motorKmh=()=>TRIP.boat==='jet'?32:13;
+// Net upstream speed over ground, against the current. A small prop boat (6 hp) gets about halfway from Medlock
+// to Abbotts in 45 min in normal water (about 2.7 mph), slower against release water. Jet boats run about 20 mph.
+const MOTOR_KMH={prop:{low:4.3,falling:3.8,caution:3.4,high:2.9},jet:{low:32,falling:30,caution:26,high:24}};
+const motorKmh=(water)=>{const m=MOTOR_KMH[TRIP.boat==='jet'?'jet':'prop']; return m[water]||m.low;};
+let CUR_CTX=null;
 const launch=()=>LAUNCHES.find(l=>l.id===TRIP.launch)||LAUNCHES.find(l=>l.id==='medlock');
 
 function stateAt(km,t,ctx){
@@ -1040,15 +1043,18 @@ try{const s=JSON.parse(localStorage.getItem('medlockTrip')||'{}'); delete s.lead
   Object.assign(TRIP,s)}catch(e){}
 // From any ramp but the dam: motor upstream, turn around, float back to the ramp.
 // From the dam you can't go upstream, so float down first, then motor back up.
-function tripPath(T){
+function tripPath(T,ctx=CUR_CTX){
   const L=launch(), mot=TRIP.motor*60e3, fl=TRIP.float*H;
-  const reach=TRIP.motor/60*motorKmh();
+  const reach=TRIP.motor/60*motorKmh('low');
   if(L.id==='dam'){
     const pool=poolOf(L), far=Math.min(L.km+reach, pool[pool.length-1].km);
     return {floatFirst:true, fStart:T, fEnd:T+fl, mStart:T+fl, end:T+fl+mot,
       floatKm:f=>L.km+(far-L.km)*f, motorKm:f=>far-(far-L.km)*f, turn:far};
   }
-  const turn=Math.max(poolOf(L)[0].km, L.km-reach);
+  // Motor upstream step by step: slower where release water is running
+  let turn=L.km; const top=poolOf(L)[0].km, st5=5*60e3;
+  for(let t=T;t<T+mot&&turn>top;t+=st5){ const sx=ctx?stateAt(turn,t,ctx):null; turn-=motorKmh(sx&&sx.water)*st5/H; }
+  turn=Math.max(top,turn);
   return {floatFirst:false, mStart:T, fStart:T+mot, fEnd:T+mot+fl, end:T+mot+fl,
     motorKm:f=>L.km-(L.km-turn)*f, floatKm:f=>turn+(L.km-turn)*f, turn};
 }
@@ -1125,7 +1131,14 @@ function tripScore(T,ctx,sunT){
   // A jet boat runs release water easily; for a prop boat it is slow and costly
   if(TRIP.boat==='jet'){ if(flags.motorHigh) pen+=4; else if(flags.motorRising) pen+=2; }
   else if(flags.motorHigh) pen+=P.floatFirst?10:15; else if(flags.motorRising) pen+=8;
+  // Score the whole outing: the motor run (and the launch spot) as well as the float
   let sum=0,n=0,prev=null;
+  for(let t=P.mStart;t<P.mStart+mot;t+=step){
+    const r=fishQ(t,P.motorKm((t-P.mStart)/mot),ctx,sunT); if(!r||r.dark) continue;
+    if(r.s&&r.s.turb!=null&&r.s.turb>=10) flags.muddy=true;
+    sum+=r.q;n++;
+  }
+  const nMot=n;
   for(let t=P.fStart;t<P.fEnd;t+=step){
     const r=fishQ(t,P.floatKm((t-P.fStart)/fl),ctx,sunT); if(!r) continue;
     if(r.dark){ flags.afterDark=true; continue; }
@@ -1136,7 +1149,7 @@ function tripScore(T,ctx,sunT){
   }
   if(P.end>+sunT.set+30*60e3) flags.afterDark=true;
   if(!n) return {score:null};
-  flags.hiShare=(flags.hiN||0)/n; flags.fishH=n*step/H; flags.planH=TRIP.float; flags.close=+sunT.set+30*60e3;
+  flags.hiShare=(flags.hiN||0)/Math.max(1,n-nMot); flags.fishH=(n-nMot)*step/H; flags.planH=TRIP.float; flags.close=+sunT.set+30*60e3; flags.turnKm=P.turn;
   if(flags.releaseHit) pen+=10;
   return {score:Math.max(0,Math.round(sum/n-pen*1.25)),flags,fEnd:P.end};
 }
@@ -1344,7 +1357,7 @@ function buildCtx(){
   const {S,ev,base,baseAtl,now}=LAST;
   const sched=schedReleases();
   const rel=[...ev.map(e=>({...e,src:'gauge'})), ...sched.filter(s=>!ev.some(e=>Math.abs(e.on-s.on)<2*H))];
-  const c={S,base,baseAtl,now,rel,sched,ev,turbResid:0};
+  const c={S,base,baseAtl,now,rel,sched,ev,turbResid:0}; CUR_CTX=c;
   // Anchor projections to what Medlock measures now: any stain beyond what the release model explains
   // (e.g. a slow-clearing fall release) carries forward and fades with an 8 h half-life, erring muddy.
   try{
@@ -1458,11 +1471,12 @@ function renderWindows(){
 }
 
 function tripDesc(){
-  const L=launch(), to=takeout(L), mph=TRIP.boat==='jet'?20:8;
+  const L=launch(), to=takeout(L), mph=TRIP.boat==='jet'?20:2.7, P0=tripPath(Date.now());
   if(TRIP.boat==='wade') return `wading at ${L.name} for ${fmtDur(TRIP.float)}; release water at the ramp counts as unsafe`;
   if(TRIP.boat==='drift'||TRIP.motor===0) return `drift down to ${to.name}, no motor (about ${((to.km-L.km)/1.609).toFixed(1)} mi; drift time depends on the flow you get)`;
   if(L.id==='dam') return `${fmtDur(TRIP.float)} float down, ${TRIP.motor} min motor back at about ${mph} mph`;
-  return `${TRIP.motor} min up (about ${Math.min(TRIP.motor/60*mph,(L.km-LAUNCHES[0].km)/1.609).toFixed(0)} mi at ${mph} mph), ${fmtDur(TRIP.float)} float back`;
+  { const mi=(L.km-P0.turn)/1.609, near=LAUNCHES.filter(x=>x.pool===L.pool).reduce((a,b)=>Math.abs(b.km-P0.turn)<Math.abs(a.km-P0.turn)?b:a);
+    return `${TRIP.motor} min up (about ${mi.toFixed(1)} mi${Math.abs(near.km-P0.turn)<1?` to ${SHORT[near.id]||near.name}`:''} at about ${mph} mph over ground, slower against release water), ${fmtDur(TRIP.float)} float back`; }
 }
 const RAMP_LABEL={trailer:'Trailer ramp',hand:'Hand-carry only',check:'Unconfirmed'};
 const WADE_LABEL={common:'Popular wading',limited:'Limited wading',not:'Not known for wading'};

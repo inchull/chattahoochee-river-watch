@@ -661,7 +661,7 @@ function simulateDrift(from,to,T,ctx){
   while(km<to.km && t<T+96*H){
     const r=fishQ(t,km,ctx,sun(new Date(t))), s=r&&r.s;
     pts.push({t,km});
-    if(r){ if(r.dark) dark=true; sum+=r.q; n++; }
+    if(r){ if(r.dark) dark=true; else { sum+=r.q; n++; } } // hours outside legal fishing time don't lower the score
     if(s){ const isHi=s.water==='high'||s.water==='caution'; if(isHi) hi++; if(isHi&&prev===false&&!hit) hit={t,km}; prev=isHi;
       if(s.turb!=null&&s.turb>=10) muddy=true; if(s.ec!=null&&s.ec>=235) ecHi=true; }
     km+=driftKmh(km,s?s.water:null)*step/H; t+=step;
@@ -1061,9 +1061,7 @@ function fishQ(t,km,ctx,sunT){
   if(tq!=null) q+=tq;
   if(s.tf!=null) q+= s.tf>68?-40: s.tf>65?-10: s.tf<45?-10:5;
   if(s.ec!=null && s.ec>=235) q-=10;
-  // Low-light bonus, but stained water cancels it: full at 3 FNU or less, none at 8+
-  if((t>=+sunT.rise-30*60e3&&t<=+sunT.rise+2*H)||(t>=+sunT.set-2*H&&t<=+sunT.set+30*60e3)) q+=20*(s.turb==null?1:Math.max(0,Math.min(1,(8-s.turb)/5)));
-  return {q:Math.round(Math.max(0,Math.min(100,q))),s};
+    return {q:Math.round(Math.max(0,Math.min(100,q))),s};
 }
 // Takeout for one-way drifts: the chosen ramp if it is downstream of the launch, else the next one
 // Default take-out: the next ramp downstream in the same pool that this boat can use
@@ -1079,7 +1077,7 @@ function wadeScore(T,ctx,sunT){
   const flags={wade:true,afterDark:false,rise:null,startHigh:false,muddy:false};
   for(let t=T;t<T+dur;t+=step){
     const r=fishQ(t,L.km,ctx,sunT); if(!r) continue;
-    if(r.dark) flags.afterDark=true;
+    if(r.dark){ flags.afterDark=true; continue; } // outside legal hours: shortens the session, doesn't lower the score
     let q=r.q;
     if(r.s){ const hi=r.s.water==='high'||r.s.water==='caution';
       if(hi){ q=0; if(prev===null) flags.startHigh=true; else if(prev===false&&!flags.rise) flags.rise={t,into:(t-T)/H}; }
@@ -1089,6 +1087,7 @@ function wadeScore(T,ctx,sunT){
   if(!n) return {score:null};
   // Steer toward water people actually wade: not known for wading -20, limited -8
   const pen=L.wade==='not'?20:L.wade==='limited'?8:0; flags.wadeRating=L.wade;
+  flags.fishH=n*step/H; flags.planH=dur/H; flags.close=+sunT.set+30*60e3;
   return {score:Math.max(0,Math.round(sum/n)-pen),flags,fEnd:T+dur};
 }
 function driftScore(T,ctx,sunT){
@@ -1099,15 +1098,15 @@ function driftScore(T,ctx,sunT){
     const r=fishQ(t,km,ctx,sunT);
     if(r){
       if(r.dark) flags.afterDark=true;
-      if(r.s){ const hi=r.s.water==='high'||r.s.water==='caution'; if(hi) flags.hiN=(flags.hiN||0)+1;
+      else { if(r.s){ const hi=r.s.water==='high'||r.s.water==='caution'; if(hi) flags.hiN=(flags.hiN||0)+1;
         if(hi && prev===false && !flags.releaseHit) flags.releaseHit={t,into:(t-T)/H};
         prev=hi; if(r.s.turb!=null&&r.s.turb>=10) flags.muddy=true; }
-      sum+=r.q;n++;
+      sum+=r.q;n++; }
     }
     km+=driftKmh(km,r&&r.s?r.s.water:null)*step/H; t+=step;
   }
   if(!n) return {score:null};
-  flags.hours=(t-T)/H; flags.hiShare=(flags.hiN||0)/n;
+  flags.hours=(t-T)/H; flags.hiShare=(flags.hiN||0)/n; flags.fishH=n*step/H; flags.planH=flags.hours; flags.close=+sunT.set+30*60e3;
   return {score:Math.max(0,Math.round(sum/n-(flags.releaseHit?10:0))),flags,fEnd:t};
 }
 function tripScore(T,ctx,sunT){
@@ -1128,7 +1127,7 @@ function tripScore(T,ctx,sunT){
   let sum=0,n=0,prev=null;
   for(let t=P.fStart;t<P.fEnd;t+=step){
     const r=fishQ(t,P.floatKm((t-P.fStart)/fl),ctx,sunT); if(!r) continue;
-    if(r.dark) flags.afterDark=true;
+    if(r.dark){ flags.afterDark=true; continue; }
     if(r.s){ const hi=r.s.water==='high'||r.s.water==='caution'; if(hi) flags.hiN=(flags.hiN||0)+1;
       if(hi && prev===false && !flags.releaseHit) flags.releaseHit={t,into:(t-P.fStart)/H};
       prev=hi; if(r.s.turb!=null&&r.s.turb>=10) flags.muddy=true; }
@@ -1136,7 +1135,7 @@ function tripScore(T,ctx,sunT){
   }
   if(P.end>+sunT.set+30*60e3) flags.afterDark=true;
   if(!n) return {score:null};
-  flags.hiShare=(flags.hiN||0)/n;
+  flags.hiShare=(flags.hiN||0)/n; flags.fishH=n*step/H; flags.planH=TRIP.float; flags.close=+sunT.set+30*60e3;
   if(flags.releaseHit) pen+=10;
   return {score:Math.max(0,Math.round(sum/n-pen)),flags,fEnd:P.end};
 }
@@ -1169,7 +1168,7 @@ function tripNotes(tr){
     if(f.wadeRating==='not') out.push(['w',`${launch().name} isn’t known for wading. Try a popular wading spot like Settles Bridge, Jones Bridge or Island Ford.`]);
     if(f.startHigh) out.push(['b','Release water at the ramp. Not safe to wade.']);
     if(f.rise) out.push(['b',`Water starts rising at the ramp about ${fmtT(new Date(f.rise.t))}, ${f.rise.into.toFixed(1)} h into your session. Be out of the river before then.`]);
-    if(f.afterDark) out.push(['w','Your session runs past legal fishing hours.']);
+    if(f.afterDark) out.push(['w',`Legal fishing hours end at ${fmtT(new Date(f.close))}, so you get about ${fmtDur(f.fishH)} of your ${fmtDur(f.planH)} session.`]);
     if(f.muddy) out.push(['w','Stained water for part of the session.']);
     return out;
   }
@@ -1178,7 +1177,7 @@ function tripNotes(tr){
   else if(f.motorRising) out.push(['w','Release water is building as you motor up.']);
   if(f.releaseHit) out.push(['w',`Release water reaches you about ${fmtT(new Date(f.releaseHit.t))}, ${f.releaseHit.into.toFixed(1)} h into the ${f.drift?'drift':'float'}. Expect rising, stained water${f.drift?' and a faster drift':''}.${jet?' In a jet boat you can run back up behind it to clearing water.':''}`]);
   if(!f.releaseHit && f.hiShare>=0.25) out.push(['b',`You’d be on release water for ${Math.round(f.hiShare*100)}% of the ${f.drift?'drift':'float'}: high, fast and stained. Tough fishing.`]);
-  if(f.afterDark) out.push(['w','The float runs past legal fishing hours. Launch earlier or shorten it.']);
+  if(f.afterDark) out.push(['w',`Legal fishing hours end at ${fmtT(new Date(f.close))}, so you get about ${fmtDur(f.fishH)} of your ${fmtDur(f.planH)} float.`]);
   if(f.muddy&&!f.releaseHit) out.push(['w','Stained water for part of the float.']);
   return out;
 }
@@ -1381,7 +1380,7 @@ function renderBest(ctx){
   const L=launch(), step=15*60e3, now=Date.now(), h=+horizon(L);
   const t0=Math.ceil(now/step)*step;
   let all0=[]; for(let t=t0;t<=h;t+=step){ const r=fullScore(t,ctx); if(r) all0.push(r); }
-  // Only recommend trips that finish within legal fishing hours (fall back to any if none do)
+  // Recommend trips with the full planned time in legal hours; shortened trips score on conditions but aren't the pick
   const inHours=all0.filter(r=>!(r.tr.flags&&r.tr.flags.afterDark)); const all=inHours.length?inHours:all0;
   $('bestTitle').textContent=`Best time to ${TRIP.boat==='wade'?'wade':'launch'} from ${SHORT[L.id]||L.name}`;
   const hd=new Date(h).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'});

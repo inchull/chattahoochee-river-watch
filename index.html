@@ -1010,7 +1010,10 @@ function stateAt(km,t,ctx){
   // Above Morgan Falls: add each release's modeled stain (size, turbines, season) on top of the clear-water level
   if(tq>=+now && t>+now && !lower){
     let add=0; for(const r of rel) if(t>+r.on && t<+relOff(r)+30*H) add+=relTurb(r,km,t,water);
-    if(ctx.turbResid) add+=ctx.turbResid*Math.pow(0.5,Math.max(0,t-(ctx.residT||+now))/(8*H));
+    // The leftover stain measured at Medlock is release water moving downstream: upstream spots cleared that much
+    // earlier, downstream spots get it later. Shift its age by the difference in settle time from Medlock.
+    if(ctx.turbResid){ const age=t-(ctx.residT||+now)+(prof(MED_KM).settle-prof(km).settle)*H;
+      add+=age<0?ctx.turbResid:ctx.turbResid*Math.pow(0.5,age/(8*H)); }
     if(turb!=null) turb=Math.round((turb+add)*10)/10;
     if(ec!=null) ec=Math.round(ec*(1+0.075*add));
   }

@@ -241,7 +241,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
       <label>Boat<select id="tBoat"><option value="prop">Prop</option><option value="jet">Jet</option><option value="drift">Drift boat</option><option value="wade">Wading</option></select></label>
       <label id="motorLbl">Motor up<select id="tMotor"><option value="0">0 (drift)</option><option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">1 h</option><option value="90">1.5 h</option></select></label>
       <label id="takeLbl" hidden>Take out at<select id="tTake"></select></label>
-      <label id="floatLbl">Float back<select id="tFloat"><option value="0">—</option><option value="1">1 h</option><option value="2">2 h</option><option value="3">3 h</option><option value="3.5">3.5 h</option><option value="4">4 h</option><option value="4.5">4.5 h</option><option value="5">5 h</option></select></label>
+      <label id="floatLbl">Float back<select id="tFloat"><option value="0">—</option><option value="1">1 h</option><option value="2">2 h</option><option value="2.5">2.5 h</option><option value="3">3 h</option><option value="3.25">3 h 15 min</option><option value="3.5">3.5 h</option><option value="3.67">3 h 40 min</option><option value="4">4 h</option><option value="4.5">4.5 h</option><option value="5">5 h</option></select></label>
     </div>
     <div class="fishat"><label for="tDayW">Fish at</label><select id="tDayW" aria-label="Day"></select><select id="tTimeW" aria-label="Time"></select><button type="button" id="tNow">Set time to now</button></div>
     <p class="whenmsg" id="whenMsg" hidden></p>
@@ -1025,9 +1025,15 @@ function stateAt(km,t,ctx){
 function slotState(t,ctx){return stateAt(launch().km,t,ctx)}
 
 // ---- Trip model ----
-const TRIP_DEFAULT={boat:'prop',motor:45,float:4,launch:'medlock',take:null};
+// Most trips run about 4 hours in all: motor time up plus the float back
+const fmtDur=h=>{const m=Math.round(h*60), hh=Math.floor(m/60), mm=m%60; return hh&&mm?`${hh} h ${mm} min`:hh?`${hh} h`:`${mm} min`;};
+const TRIP_HOURS=4, floatFor=m=>m>0?Math.round((TRIP_HOURS-m/60)*100)/100:0;
+const TRIP_DEFAULT={boat:'prop',motor:45,float:3.25,launch:'medlock',take:null,v:2};
 let TRIP={...TRIP_DEFAULT};
-try{const s=JSON.parse(localStorage.getItem('medlockTrip')||'{}'); delete s.lead; Object.assign(TRIP,s)}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('medlockTrip')||'{}'); delete s.lead;
+  // v2: trips default to 4 h in all; move older saved trips that used the old 4 h float default
+  if(s.boat&&!s.v){ if(s.motor>0&&s.float===4) s.float=floatFor(s.motor); if(s.boat==='wade'&&s.float===3) s.float=4; s.v=2; }
+  Object.assign(TRIP,s)}catch(e){}
 // From any ramp but the dam: motor upstream, turn around, float back to the ramp.
 // From the dam you can't go upstream, so float down first, then motor back up.
 function tripPath(T){
@@ -1319,9 +1325,9 @@ function renderVerdict(ctx){
   const back=!tr.fEnd?'':tr.flags&&tr.flags.wade?` Wade now and you’re done about ${fmtT(new Date(tr.fEnd))}.`:tr.flags&&tr.flags.drift?` Drift now and you reach ${tr.flags.to} about ${fmtT(new Date(tr.fEnd))} (${tr.flags.hours.toFixed(1)} h).`:` Launch now and you’re back about ${fmtT(new Date(tr.fEnd))}.`;
   $('verdictSub').textContent=phaseTxt+back;
   const notes=tr.score==null?[]:tripNotes(tr);
-  if(tr.score!=null&&!notes.length&&tr.flags.wade) notes.push(['g',`Steady, safe water at the ramp for your whole ${TRIP.float} h session.`]);
+  if(tr.score!=null&&!notes.length&&tr.flags.wade) notes.push(['g',`Steady, safe water at the ramp for your whole ${fmtDur(TRIP.float)} session.`]);
   if(tr.score!=null&&!notes.length&&tr.flags.drift) notes.push(['g',`Clean drift to ${tr.flags.to}. No release water reaches you.`]);
-  if(tr.score!=null&&!notes.length) notes.push(['g',launch().id==='dam'?`Clean ${TRIP.float} h float and an easy run back to the dam. No release water reaches you.`:`Clear run up and a clean ${TRIP.float} h float. No release water reaches you.`]);
+  if(tr.score!=null&&!notes.length) notes.push(['g',launch().id==='dam'?`Clean ${fmtDur(TRIP.float)} float and an easy run back to the dam. No release water reaches you.`:`Clear run up and a clean ${fmtDur(TRIP.float)} float. No release water reaches you.`]);
   $('reasons').innerHTML=[...notes,...R].map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
 }
 
@@ -1387,7 +1393,7 @@ function renderBest(ctx){
     ${span?`<p class="status">${span.slice(2,-1).replace(/^./,c=>c.toUpperCase())}.</p>`:''}
     <ul class="bestWhy">${why.map(t=>`<li>${t}</li>`).join('')}</ul>
     ${alts.length?`<p class="foot">Other good times</p><div class="bestAlt">${alts.map(w=>`<button type="button" data-t="${w.best.T}">${dayLbl(w.best.T)} ${fmtT(new Date(w.best.T))} · ${w.best.score}</button>`).join('')}</div>`:''}
-    <p class="foot">Searched every 15 minutes from now through ${hd}, the end of the posted Corps schedule, for your ${TRIP.boat==='wade'?`${TRIP.float} h wading session`:`trip (${TRIP.motor} min up, ${TRIP.float} h back)`}. Scores weigh water level, turbidity, temperature, light and every release before and after.</p>`;
+    <p class="foot">Searched every 15 minutes from now through ${hd}, the end of the posted Corps schedule, for your ${TRIP.boat==='wade'?`${fmtDur(TRIP.float)} wading session`:`${fmtDur(TRIP.motor/60+TRIP.float)} trip (${TRIP.motor} min up, ${fmtDur(TRIP.float)} back)`}. Scores weigh water level, turbidity, temperature, light and every release before and after.</p>`;
   $('best').querySelectorAll('button[data-t]').forEach(x=>x.addEventListener('click',()=>{ FISH_AT=+x.dataset.t; showWhenMsg(''); syncWhen(); renderWindows(); document.querySelector('.verdict').scrollIntoView({behavior:'smooth'}); }));
 }
 function renderWindows(){
@@ -1433,10 +1439,10 @@ function renderWindows(){
 
 function tripDesc(){
   const L=launch(), to=takeout(L), mph=TRIP.boat==='jet'?20:8;
-  if(TRIP.boat==='wade') return `wading at ${L.name} for ${TRIP.float} h; release water at the ramp counts as unsafe`;
+  if(TRIP.boat==='wade') return `wading at ${L.name} for ${fmtDur(TRIP.float)}; release water at the ramp counts as unsafe`;
   if(TRIP.boat==='drift'||TRIP.motor===0) return `drift down to ${to.name}, no motor (about ${((to.km-L.km)/1.609).toFixed(1)} mi; drift time depends on the flow you get)`;
-  if(L.id==='dam') return `${TRIP.float} h float down, ${TRIP.motor} min motor back at about ${mph} mph`;
-  return `${TRIP.motor} min up (about ${Math.min(TRIP.motor/60*mph,(L.km-LAUNCHES[0].km)/1.609).toFixed(0)} mi at ${mph} mph), ${TRIP.float} h float back`;
+  if(L.id==='dam') return `${fmtDur(TRIP.float)} float down, ${TRIP.motor} min motor back at about ${mph} mph`;
+  return `${TRIP.motor} min up (about ${Math.min(TRIP.motor/60*mph,(L.km-LAUNCHES[0].km)/1.609).toFixed(0)} mi at ${mph} mph), ${fmtDur(TRIP.float)} float back`;
 }
 const RAMP_LABEL={trailer:'Trailer ramp',hand:'Hand-carry only',check:'Unconfirmed'};
 const WADE_LABEL={common:'Popular wading',limited:'Limited wading',not:'Not known for wading'};
@@ -1474,11 +1480,11 @@ function tripControls(){
   };
   // Sensible starting points; everything stays adjustable after
   const defaults=(boat,launchId)=>{
-    if(boat==='wade') return {motor:0,float:3};
+    if(boat==='wade') return {motor:0,float:TRIP_HOURS};
     if(boat==='drift') return {motor:0,float:0};
-    if(boat==='jet') return {motor:20,float:4};
+    if(boat==='jet') return {motor:20,float:floatFor(20)};
     const Lx=LAUNCHES.find(x=>x.id===launchId);
-    return (launchId==='medlock'||!nextRamp(Lx))?{motor:45,float:4}:{motor:0,float:0};
+    return (launchId==='medlock'||!nextRamp(Lx))?{motor:45,float:floatFor(45)}:{motor:0,float:0};
   };
   if(!TRIP.boat) TRIP.boat='prop';
   $('tBoat').value=TRIP.boat; $('tLaunch').value=TRIP.launch; $('tMotor').value=TRIP.motor; $('tFloat').value=TRIP.float; sync();
@@ -1486,9 +1492,9 @@ function tripControls(){
     const boat=$('tBoat').value, launchId=$('tLaunch').value;
     let motor=+$('tMotor').value, float=+$('tFloat').value, take=$('tTake').value;
     if(ev.target.id==='tBoat'||ev.target.id==='tLaunch'){ ({motor,float}=defaults(boat,launchId)); take=null; }
-    else if(ev.target.id==='tMotor'){ if(motor===0) float=0; else if(float===0) float=4; }
+    else if(ev.target.id==='tMotor'){ float=floatFor(motor); }
     $('tMotor').value=motor; $('tFloat').value=float;
-    TRIP={boat,motor,float,launch:launchId,take}; sync(); TRIP.take=$('tTake').value;
+    TRIP={boat,motor,float,launch:launchId,take,v:2}; sync(); TRIP.take=$('tTake').value;
     try{localStorage.setItem('medlockTrip',JSON.stringify(TRIP))}catch(e){}
     if(LAST) render(LAST.S); else renderWindows();
     if(ZOOM&&ZOOM.kind==='chart'&&$('zRamp')){ $('zRamp').value=TRIP.launch; drawRampChart('zchart'); }

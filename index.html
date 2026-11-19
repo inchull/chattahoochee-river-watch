@@ -874,14 +874,16 @@ const PROFILE=[
 // Measured at Medlock from 300 dry releases (Nov 2023 to Nov 2026, USGS 15-min data). Times are hours after the dam
 // shuts off. wade: within 0.8 ft of the pre-release level; settle: within 0.3 ft; fnu: added turbidity at its peak;
 // clear: turbidity back within 1 FNU of the pre-release level. PROFILE above matches a typical 2-3 h release.
+// fnu/clear are for Dec-Aug; fnuF/clearF for fall (Sep-Nov).
+// Fall (Sep-Nov) releases stain about twice as much and clear 3-6 h later, so fall gets its own fnu/clear.
 const REL_FIT=[
-  {d:1.5,ft:1.1,wade:10.0,settle:13.8,fnu:1.8, clear:10.6},
-  {d:2.5,ft:1.8,wade:11.8,settle:15.2,fnu:6.0, clear:13.5},
-  {d:3.5,ft:3.0,wade:12.9,settle:16.1,fnu:10.8,clear:12.5},
-  {d:5.0,ft:3.7,wade:13.0,settle:15.8,fnu:10.3,clear:9.5},
-  {d:8.0,ft:5.8,wade:13.5,settle:16.0,fnu:11.0,clear:8.0}];
-// Turbidity multipliers: two turbines stain about 1.6x one; fall releases stain most, winter least
-const TURB_SEASON=[0.6,0.6,0.9,0.9,0.9,1.1,1.1,1.1,1.3,1.3,1.3,0.6];
+  {d:1.5,ft:1.1,wade:10.0,settle:13.8,fnu:1.7, clear:10.5,fnuF:5.0, clearF:16.5},
+  {d:2.5,ft:1.8,wade:11.8,settle:15.2,fnu:5.3, clear:12.1,fnuF:7.8, clearF:15.5},
+  {d:3.5,ft:3.0,wade:12.9,settle:16.1,fnu:7.8, clear:10.6,fnuF:12.1,clearF:13.5},
+  {d:5.0,ft:3.7,wade:13.0,settle:15.8,fnu:9.1, clear:8.4, fnuF:15.3,clearF:12.5},
+  {d:8.0,ft:5.8,wade:13.5,settle:16.0,fnu:9.1, clear:8.4, fnuF:15.3,clearF:12.5}];
+// Outside fall: winter releases stain least. Two turbines stain about 1.6x one.
+const TURB_SEASON=[0.7,0.7,1,1,1,1.2,1.2,1.2,1,1,1,0.7];
 const RSZ=new WeakMap();
 function relSize(r){
   if(RSZ.has(r)) return RSZ.get(r);
@@ -893,9 +895,9 @@ function relSize(r){
   let two=null;
   if(r.mw) two=r.mw>=90;
   else if(typeof LAST!=='undefined'&&LAST){ const dam=(LAST.S[SITES.dam+':00060']||[]).filter(x=>+x.t>=on&&+x.t<=off+0.5*H); if(dam.length) two=Math.max(...dam.map(x=>x.v))>=7000; }
-  const fall=[8,9,10].includes(new Date(on).getMonth());
+  const mo=new Date(on).getMonth(), fall=[8,9,10].includes(mo);
   const o={d, ft:L('ft'), wadeK:L('wade')/11.8*(fall?1.07:1), settleK:L('settle')/15.0*(fall?1.07:1),
-    fnu:L('fnu')*(two===true?1.6:two===false?0.9:1)*TURB_SEASON[new Date(on).getMonth()], clear:L('clear')*(fall?1.07:1), two};
+    fnu:(fall?L('fnuF'):L('fnu')*TURB_SEASON[mo])*(two===true?1.6:two===false?0.9:1), clear:fall?L('clearF'):L('clear'), two};
   RSZ.set(r,o); return o;
 }
 // Release timing at km for release r, scaled by its size
@@ -909,7 +911,7 @@ function relTurb(r,km,t,water){
   const z=relSize(r), p=relProf(km,r), on=+r.on, off=+relOff(r), A=z.fnu;
   const t0=on+(p.rise+1)*H, tp=Math.max(on+p.peak*H,t0+0.5*H), tc=Math.max(off+z.clear*(prof(km).settle/15)*H,tp+H);
   let a=0;
-  if(t>t0&&t<=tp) a=A*(t-t0)/(tp-t0); else if(t>tp&&t<tc) a=A*Math.pow((tc-t)/(tc-tp),1.5);
+  if(t>t0&&t<=tp) a=A*(t-t0)/(tp-t0); else if(t>tp&&t<tc) a=A*(tc-t)/(tc-tp);
   return a;
 }
 function prof(km){
@@ -1008,6 +1010,7 @@ function stateAt(km,t,ctx){
   // Above Morgan Falls: add each release's modeled stain (size, turbines, season) on top of the clear-water level
   if(tq>=+now && t>+now && !lower){
     let add=0; for(const r of rel) if(t>+r.on && t<+relOff(r)+30*H) add+=relTurb(r,km,t,water);
+    if(ctx.turbResid) add+=ctx.turbResid*Math.pow(0.5,Math.max(0,t-(ctx.residT||+now))/(8*H));
     if(turb!=null) turb=Math.round((turb+add)*10)/10;
     if(ec!=null) ec=Math.round(ec*(1+0.075*add));
   }
@@ -1050,11 +1053,14 @@ function fishQ(t,km,ctx,sunT){
   if(t<+sunT.rise-30*60e3||t>+sunT.set+30*60e3) return {q:0,dark:true};
   const s=stateAt(km,t,ctx); if(!s) return null;
   let q = s.water==='low'?60 : s.water==='falling'?Math.round(30+30*Math.min(1,Math.max(0,s.fallF??0.5))) : s.water==='caution'?40 : 15;
-  if(s.turb!=null) q+= s.turb<5?15: s.turb<10?0: s.turb<20?-20:-40;
+  // Turbidity: smooth, no cliffs at band edges (3 FNU +15, 5 +8, 10 -5, 20 -25, 40+ -40)
+  const tq=s.turb==null?null:(v=>{const P=[[0,15],[3,15],[5,8],[10,-5],[20,-25],[40,-40]]; if(v>=40) return -40; const i=P.findIndex(p=>p[0]>=v); if(i<=0) return 15; const [x0,y0]=P[i-1],[x1,y1]=P[i]; return y0+(y1-y0)*(v-x0)/(x1-x0);})(s.turb);
+  if(tq!=null) q+=tq;
   if(s.tf!=null) q+= s.tf>68?-40: s.tf>65?-10: s.tf<45?-10:5;
   if(s.ec!=null && s.ec>=235) q-=10;
-  if((t>=+sunT.rise-30*60e3&&t<=+sunT.rise+2*H)||(t>=+sunT.set-2*H&&t<=+sunT.set+30*60e3)) q+=20;
-  return {q:Math.max(0,Math.min(100,q)),s};
+  // Low-light bonus, but stained water cancels it: full at 3 FNU or less, none at 8+
+  if((t>=+sunT.rise-30*60e3&&t<=+sunT.rise+2*H)||(t>=+sunT.set-2*H&&t<=+sunT.set+30*60e3)) q+=20*(s.turb==null?1:Math.max(0,Math.min(1,(8-s.turb)/5)));
+  return {q:Math.round(Math.max(0,Math.min(100,q))),s};
 }
 // Takeout for one-way drifts: the chosen ramp if it is downstream of the launch, else the next one
 // Default take-out: the next ramp downstream in the same pool that this boat can use
@@ -1334,7 +1340,18 @@ function buildCtx(){
   const {S,ev,base,baseAtl,now}=LAST;
   const sched=schedReleases();
   const rel=[...ev.map(e=>({...e,src:'gauge'})), ...sched.filter(s=>!ev.some(e=>Math.abs(e.on-s.on)<2*H))];
-  return {S,base,baseAtl,now,rel,sched,ev};
+  const c={S,base,baseAtl,now,rel,sched,ev,turbResid:0};
+  // Anchor projections to what Medlock measures now: any stain beyond what the release model explains
+  // (e.g. a slow-clearing fall release) carries forward and fades with an 8 h half-life, erring muddy.
+  try{
+    const tu=S[SITES.med+':63680']||[], last=tu[tu.length-1];
+    if(last && +now-+last.t<3*H){
+      const a=tu.filter(p=>+p.t>+now-48*H).map(p=>p.v), clear=a.length?pct(a,0.25):last.v;
+      let modeled=0; for(const r of rel) if(+last.t>+r.on && +last.t<+relOff(r)+30*H) modeled+=relTurb(r,MED_KM,+last.t,'');
+      c.turbResid=Math.max(0,last.v-clear-modeled); c.residT=+last.t;
+    }
+  }catch(e){}
+  return c;
 }
 function dayRow(d,ctx,{isToday,future,meta}){
   const {slots,wins}=dayWindows(d,ctx);

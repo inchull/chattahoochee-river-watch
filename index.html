@@ -1115,8 +1115,12 @@ function todayReleases(ctx){
   const list=ctx.rel.filter(r=>dayKey(new Date(r.on))===k).sort((a,b)=>a.on-b.on);
   if(!list.length) return (SCHED&&SCHED.days[k])?'No release today.':'Today’s release schedule isn’t posted yet.';
   const one=r=>{const on=+r.on, off=r.off?+r.off:null;
-    const st=off&&off<=now?'ran':on<=now?'running now':'scheduled';
-    return `${fmtT(new Date(on))} to ${off?fmtT(new Date(off)):'now'} (${st})`;};
+    if(!off){ // running now per the dam gauge: take the end time from the Corps schedule
+      const s=schedReleases().find(x=>+x.on<=on+2*H && +x.off>on-H);
+      return s?`${fmtT(new Date(on))} to about ${fmtT(s.off)} (${+s.off>now?'running now':'should be shutting off; dam gauge not updated yet'})`
+              :`${fmtT(new Date(on))}, running now (end time not posted)`; }
+    const st=off<=now?'ran':on<=now?'running now':'scheduled';
+    return `${fmtT(new Date(on))} to ${fmtT(new Date(off))} (${st})`;};
   return `Today’s release${list.length>1?'s':''}: ${list.map(one).join(', ')}.`;
 }
 function setProjRel(t){ const e=$('projRel'); e.textContent=t||''; e.hidden=!t; $('releaseStatus').hidden=!!t; }

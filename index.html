@@ -931,12 +931,12 @@ function prof(km){
   return o;
 }
 // River km below the dam. Ramp spacing follows the published NPS river-trip section lengths
-// (npplan.com river trips by section); the dam and Bowmans Island come from the USGS NHDPlus flowline.
+// (npplan.com river trips by section); the dam comes from the USGS NHDPlus flowline.
+// The Buford Dam ramp and the Bowmans Island ramp are the same ramp.
 // ramp: 'trailer' = boat ramp for trailered boats; 'hand' = canoe/kayak, carry in; 'check' = status unconfirmed.
 // pool: Morgan Falls Dam splits the river; you can't drift or motor between 'upper' and 'lower'.
 const LAUNCHES=[
-  {id:'dam',name:'Buford Dam (Lower Pool)',km:0.7,ramp:'trailer',pool:'upper',note:'Corps park ramp below the dam. PFD required from the dam to GA 20.',wade:'common',wadeNote:'Good wading on both sides. Life jacket required from the dam to GA 20.'},
-  {id:'bowmans',name:'Bowmans Island',km:4.4,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.',wade:'common',wadeNote:'Named as a comfortable wading spot.'},
+  {id:'dam',name:'Buford Dam / Bowmans Island',km:0.7,ramp:'trailer',pool:'upper',note:'Ramp below the dam, also called the Bowmans Island ramp. PFD required from the dam to GA 20.',wade:'common',wadeNote:'Good wading on both sides. Life jacket required from the dam to GA 20.'},
   {id:'settles',name:'Settles Bridge',km:9.6,ramp:'hand',pool:'upper',note:'Hand-launch only: carry about 0.1 mi from the lot. No trailers.',wade:'common',wadeNote:'Great wading; the GA 20 to Settles stretch is often called the best wading on the tailwater.'},
   {id:'mcginnis',name:'McGinnis Ferry',km:16.0,ramp:'trailer',pool:'upper',note:'NPS ramp for boats and canoes.',wade:'not',wadeNote:'County fencing blocks wading access upstream of the ramp.'},
   {id:'rogers',name:'Rogers Bridge',km:20.0,ramp:'hand',pool:'upper',note:'Hand-launch only, no motors. NPS lists it as temporarily closed; check before going.',wade:null,wadeNote:'No wading information found.'},
@@ -952,7 +952,7 @@ const LAUNCHES=[
   {id:'powers',name:'Powers Island (Cochran Shoals)',km:69.0,ramp:'hand',pool:'lower',note:'Canoe-only launch, in the delayed-harvest section.',wade:'limited',wadeNote:'Main delayed-harvest access, named for its shoals; no detailed wading info found.'},
   {id:'palisades',name:'Palisades (Whitewater Cr. / Akers Mill)',km:71.3,ramp:'hand',pool:'lower',note:'Canoe-only launches on both banks, in the delayed-harvest section.',wade:'common',wadeNote:'Extensive wading in the delayed-harvest section.'},
   {id:'pacesmill',name:'Paces Mill (US 41)',km:73.0,ramp:'trailer',pool:'lower',note:'NPS ramp for boats and canoes. Lower end of the delayed-harvest section.',wade:'common',wadeNote:'Extensive wading in the delayed-harvest section. Check park status in season.'}];
-const SHORT={dam:'Buford Dam',bowmans:'Bowmans Is.',settles:'Settles Br.',mcginnis:'McGinnis Fy.',rogers:'Rogers Br.',abbotts:'Abbotts Br.',medlock:'Medlock Br.',jones:'Jones Br.',garrard:'Garrard Ldg.',islandford:'Island Ford',azalea:'Azalea Park',overlook:'Overlook Pk.',mfpark:'Morgan Falls Pk.',johnsonferry:'Johnson Ferry',powers:'Powers Is.',palisades:'Palisades',pacesmill:'Paces Mill'};
+const SHORT={dam:'Buford Dam',settles:'Settles Br.',mcginnis:'McGinnis Fy.',rogers:'Rogers Br.',abbotts:'Abbotts Br.',medlock:'Medlock Br.',jones:'Jones Br.',garrard:'Garrard Ldg.',islandford:'Island Ford',azalea:'Azalea Park',overlook:'Overlook Pk.',mfpark:'Morgan Falls Pk.',johnsonferry:'Johnson Ferry',powers:'Powers Is.',palisades:'Palisades',pacesmill:'Paces Mill'};
 // Delayed harvest: Sope Creek to US 41, Nov 1 - May 14
 const DH={from:66.2,to:73.0};
 const inDH=d=>{const m=d.getMonth(), day=d.getDate(); return m>=10 || m<=3 || (m===4&&day<=14)};
@@ -1050,6 +1050,8 @@ let TRIP={...TRIP_DEFAULT};
 try{const s=JSON.parse(localStorage.getItem('medlockTrip')||'{}'); delete s.lead;
   // v2: trips default to 4 h in all; move older saved trips that used the old 4 h float default
   if(s.boat&&!s.v){ if(s.motor>0&&s.float===4) s.float=floatFor(s.motor); if(s.boat==='wade'&&s.float===3) s.float=4; s.v=2; }
+  // Bowmans Island is the Buford Dam ramp
+  if(s.launch==='bowmans') s.launch='dam'; if(s.take==='bowmans') s.take='dam';
   Object.assign(TRIP,s)}catch(e){}
 // From any ramp but the dam: motor upstream, turn around, float back to the ramp.
 // From the dam you can't go upstream, so float down first, then motor back up.

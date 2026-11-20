@@ -1402,21 +1402,24 @@ function renderBest(ctx){
   const L=launch(), step=15*60e3, now=Date.now(), h=+horizon(L);
   const t0=Math.ceil(now/step)*step;
   let all0=[]; for(let t=t0;t<=h;t+=step){ const r=fullScore(t,ctx); if(r) all0.push(r); }
-  // Recommend trips with the full planned time in legal hours; shortened trips score on conditions but aren't the pick
-  const inHours=all0.filter(r=>!(r.tr.flags&&r.tr.flags.afterDark)); const all=inHours.length?inHours:all0;
+  // Trips cut short by legal hours still count (the note says how much time you get), as long as at least 1.5 h is
+  // fishable. A full-length trip wins if it's within 5 points of the best shortened one.
+  const all=all0.filter(r=>!(r.tr.flags&&r.tr.flags.afterDark)||(r.tr.flags.fishH??0)>=1.5);
   $('bestTitle').textContent=`Best time to ${TRIP.boat==='wade'?'wade':'launch'} from ${SHORT[L.id]||L.name}`;
   const hd=new Date(h).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'});
   if(!all.length){ $('best').innerHTML=`<p class="status">No legal fishing hours left before the posted schedule ends (${hd}). Check back once the Corps posts the next day.</p>`; return; }
-  // Windows: runs of consecutive slots within 5 points of their own best
-  const wins=[]; let cur=null;
-  for(const r of all){
-    if(cur && r.T-cur.end<=step && Math.abs(r.score-cur.best.score)<=5){ cur.end=r.T; if(r.score>cur.best.score) cur.best=r; }
-    else { cur={start:r.T,end:r.T,best:r}; wins.push(cur); }
-  }
-  wins.sort((a,b)=>b.best.score-a.best.score||a.start-b.start);
-  const top=wins[0], b=top.best, dayLbl=t=>{const d=new Date(t); return dayKey(d)===dayKey(new Date())?'Today':d.toLocaleDateString([], {weekday:'long'})};
+  // Best slot overall (earliest on ties); its window is the run of neighboring slots within 5 points of it
+  const pick=(list)=>{ const top=list.reduce((a,r)=>r.score>a.score?r:a,list[0]); const full=list.filter(r=>!(r.tr.flags&&r.tr.flags.afterDark));
+    const fb=full.length?full.reduce((a,r)=>r.score>a.score?r:a,full[0]):null; return fb&&fb.score>=top.score-5?fb:top; };
+  const windowOf=(b)=>{ let i=all.indexOf(b), j=i; while(i>0&&all[i].T-all[i-1].T<=step&&all[i-1].score>=b.score-5) i--; while(j<all.length-1&&all[j+1].T-all[j].T<=step&&all[j+1].score>=b.score-5) j++; return {start:all[i].T,end:all[j].T,best:b}; };
+  const b=pick(all), top=windowOf(b), dayLbl=t=>{const d=new Date(t); return dayKey(d)===dayKey(new Date())?'Today':d.toLocaleDateString([], {weekday:'long'})};
   const col=x=>x>=80?'var(--good)':x>=60?'var(--warn)':'var(--bad)';
-  const span=top.end>top.start?` (good from ${fmtT(new Date(top.start))} to ${fmtT(new Date(top.end))})`:'';
+  const BAD=b.score<70, verb=TRIP.boat==='wade'?'wade':'launch';
+  if(BAD) $('bestTitle').textContent=`No good time to ${verb} from ${SHORT[L.id]||L.name}`;
+  const span=top.end>top.start?(BAD?`Least bad from ${fmtT(new Date(top.start))} to ${fmtT(new Date(top.end))}.`:`Good from ${fmtT(new Date(top.start))} to ${fmtT(new Date(top.end))}.`):'';
+  // Other times: best slot of each other run, at least an hour from the pick
+  const others=[]; { const rest=all.filter(r=>r.T<top.start-H||r.T>top.end+H); const used=new Set();
+    for(const r of [...rest].sort((x,y)=>y.score-x.score||x.T-y.T)){ if(others.length>=3||r.score<70) break; if([...used].some(t=>Math.abs(t-r.T)<2*H)) continue; used.add(r.T); others.push({best:r}); } }
   // Why
   const why=[], st=b.st;
   const lvl={low:'Low, normal water at the ramp.',falling:'Water still dropping from a release at the ramp.',caution:'Release water arriving at the ramp.',high:'Release water at the ramp: high and fast.'}[st&&st.water];
@@ -1428,9 +1431,10 @@ function renderBest(ctx){
   const before=relLine(b.T-24*H,b.T), after=relLine(b.T,b.T+24*H);
   why.push(`Releases in the 24 h before: ${before.length?before.join(', '):'none'}.`);
   why.push(`Releases in the 24 h after: ${after.length?after.join(', '):'none'}${b.T+24*H>h?`. The schedule is only posted through ${hd}`:''}.`);
-  const alts=wins.slice(1).filter(w=>w.best.score>=60&&(w.start>top.end+H||w.end<top.start-H)).slice(0,3);
-  $('best').innerHTML=`<div class="bestTop"><span class="when">${dayLbl(b.T)} ${fmtT(new Date(b.T))}</span><span class="sc" style="background:${col(b.score)}">Score ${b.score}</span><button type="button" data-t="${b.T}">Plan this time</button></div>
-    ${span?`<p class="status">${span.slice(2,-1).replace(/^./,c=>c.toUpperCase())}.</p>`:''}
+  const alts=others;
+  $('best').innerHTML=`<div class="bestTop"><span class="when">${dayLbl(b.T)} ${fmtT(new Date(b.T))}</span><span class="sc" style="background:${col(b.score)}">Score ${b.score}</span><button type="button" data-t="${b.T}">${BAD?'See this time':'Plan this time'}</button></div>
+    ${BAD?`<p class="status">Nothing scores 70 or better through ${hd}. This is the least bad time, and conditions are poor:</p>`:''}
+    ${span?`<p class="status">${span}</p>`:''}
     <ul class="bestWhy">${why.map(t=>`<li>${t}</li>`).join('')}</ul>
     ${alts.length?`<p class="foot">Other good times</p><div class="bestAlt">${alts.map(w=>`<button type="button" data-t="${w.best.T}">${dayLbl(w.best.T)} ${fmtT(new Date(w.best.T))} · ${w.best.score}</button>`).join('')}</div>`:''}
     <p class="foot">Searched every 15 minutes from now through ${hd}, the end of the posted Corps schedule, for your ${TRIP.boat==='wade'?`${fmtDur(TRIP.float)} wading session`:`${fmtDur(TRIP.motor/60+TRIP.float)} trip (${TRIP.motor} min up, ${fmtDur(TRIP.float)} back)`}. Scores weigh water level, turbidity, temperature, every release before and after, and time of day (midday scores a little lower, most in summer).</p>`;

@@ -574,6 +574,16 @@ function chartHover(ev){
 // ---- River-by-hour map: fishing quality at every spot and time ----
 const MAPS={};
 function mapDay(now){ let day=new Date(now.getFullYear(),now.getMonth(),now.getDate()); if(+now>+sun(day).set+30*60e3) day=new Date(day.getFullYear(),day.getMonth(),day.getDate()+1); return day; }
+// Good-water map follows the Fish at pick: that day, with the planned trip drawn on it
+function mapPick(){
+  if(!FISH_AT) return {};
+  const P=tripPath(FISH_AT), path=[]; const L=launch();
+  if(TRIP.boat==='wade') return {day:mapDay(new Date(FISH_AT))};
+  for(let t=P.mStart;t<=P.end;t+=5*60e3){ const inF=t>=P.fStart&&t<=P.fEnd;
+    const km=P.floatFirst?(t<=P.fEnd?P.floatKm((t-P.fStart)/(P.fEnd-P.fStart)):P.motorKm((t-P.mStart)/(P.end-P.mStart))):(inF?P.floatKm((t-P.fStart)/(P.fEnd-P.fStart)):P.motorKm((t-P.mStart)/(P.fStart-P.mStart)));
+    path.push({t,km}); }
+  return {day:mapDay(new Date(FISH_AT)),path,ramps:[L.id]};
+}
 function renderMap(ctx,o={}){
   const id=o.svg||'rmap', now=ctx.now, day=o.day||mapDay(now), sunT=sun(day);
   const isToday=dayKey(day)===dayKey(now);
@@ -738,7 +748,7 @@ function openZoom(kind,rot){
     const drift=kind==='dmap';
     $('zoomTitle').textContent=drift?'Your drift':$('mapTitle').textContent;
     body.innerHTML=`${document.querySelector('#'+kind).closest('section').querySelector('.legend2').outerHTML}<svg id="zmap" class="rmap" width="100%" role="img" aria-label="Enlarged good-water map"></svg><div class="readout mapRead" id="zRead" hidden></div>`;
-    const ctx=buildCtx(), o={svg:'zmap',read:'zRead',tall:!ZOOM.rot};
+    const ctx=buildCtx(), o={svg:'zmap',read:'zRead',tall:!ZOOM.rot,...(kind==='rmap'?mapPick():{})};
     if(drift&&DRIFT_LAST) Object.assign(o,DRIFT_LAST);
     renderMap(ctx,o);
     $('zmap').addEventListener('pointermove',mapHover); $('zmap').addEventListener('pointerdown',mapHover);
@@ -1458,7 +1468,7 @@ function renderWindows(){
   const tom=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
   if(!SCHED||!SCHED.days[dayKey(tom)]) html+=`<div class="day"><div class="d">${tom.toLocaleDateString([], {weekday:'short'})}<small>${tom.toLocaleDateString([], {month:'short',day:'numeric'})}</small></div><div class="meta">The Corps hasn’t posted this schedule yet. Releases ran every day of the last 60, most starting 4–7 PM.</div></div>`;
   $('ahead').innerHTML=html;
-  renderMap(ctx);
+  renderMap(ctx,mapPick());
   route();
   $('schedNote').innerHTML=(SCHED?`Corps schedule checked ${new Date(SCHED.updated).toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})}. `:'<span class="err">Couldn’t load the Corps schedule file.</span> Using live dam readings only; check the recording at (770) 945-1466. ')+
     `Each bar block is a launch time from ${launch().name} scored for your whole trip: ${tripDesc()}. Future hours assume today’s clarity, E. coli, and temperature hold. The Corps can change releases without notice.`;

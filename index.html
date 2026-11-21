@@ -319,7 +319,9 @@ const LAT=33.998, LON=-84.200;
 // Turbidity bands for trout fishing (FNU): one definition used by scores, tiles, notes and the map
 const TURB_BANDS=[{max:5,c:'g',name:'Clear',fish:'good fishing'},{max:10,c:'w',name:'Light stain',fish:'fishable'},{max:20,c:'b',name:'Stained',fish:'poor fishing'},{max:Infinity,c:'b',name:'Muddy',fish:'very poor fishing'}];
 const turbBand=v=>TURB_BANDS.find(b=>v<b.max);
-const SITES={dam:'02334430',settles:'02334653',med:'02335000',atl:'02336000'};
+const SITES={dam:'02334430',settles:'02334653',med:'02335000',atl:'02336000',buf:'02334500',pow:'02335880'};
+// USGS rain gauges along the reach (basin average): Medlock, Suwanee Cr, Crooked Cr, Big Cr, Morgan Falls, Powers Ferry
+const RAIN_SITES=['02335000','02334885','02335350','02335700','02335810','02335880'];
 const H=3600e3;
 // Timing measured from 41 releases (medians)
 const T={rise:5, peak:8.2, dropAfterOff:7.8, clearAfterOff:12.8, normalAfterOff:15.2, settles:2};
@@ -336,7 +338,7 @@ const relH=d=>{const h=(d-Date.now())/H, a=Math.abs(h), v=a<1?Math.round(a*60)+'
 // USGS posts new readings every 15 min. A full 31-day pull is ~1.8 MB, so it happens once per device;
 // after that a refresh asks USGS only for readings newer than what this browser already has (a few KB),
 // and never more often than once every 2 minutes.
-const CACHE_KEY='usgsCacheV2', MIN_GAP=2*60e3, FULL_DAYS=31;
+const CACHE_KEY='usgsCacheV3', MIN_GAP=2*60e3, FULL_DAYS=31;
 let DATA=null, lastFetch=0, inflight=null;
 function cacheLoad(){
   try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); if(!c) return null;
@@ -350,7 +352,8 @@ function cacheSave(S,fetchedAt){
 async function fetchUSGS(since){
   const range=since?`startDT=${new Date(since).toISOString()}`:`period=P${FULL_DAYS}D`;
   const base=`https://waterservices.usgs.gov/nwis/iv/?format=json&siteStatus=all&${range}`;
-  const urls=[`${base}&sites=${SITES.dam}&parameterCd=00060`,`${base}&sites=${SITES.med}&parameterCd=00060,00065,63680,99407,00010,00045`,`${base}&sites=${SITES.atl}&parameterCd=00060,00065,63680,99407,00010`];
+  const urls=[`${base}&sites=${SITES.dam}&parameterCd=00060`,`${base}&sites=${SITES.med}&parameterCd=00060,00065,63680,99407,00010,00045`,`${base}&sites=${SITES.atl}&parameterCd=00060,00065,63680,99407,00010`,
+    `${base}&sites=${SITES.buf},${SITES.pow}&parameterCd=63680`,`${base}&sites=${RAIN_SITES.filter(x=>x!==SITES.med).join(',')}&parameterCd=00045`];
   const jsons=await Promise.all(urls.map(async u=>{const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json()}));
   const S={};
   for(const ts of jsons.flatMap(j=>j.value.timeSeries)){
@@ -489,7 +492,6 @@ function render(S){
   if(dawn||dusk) add('g',`Low light (sunrise ${fmtT(s.rise)}, sunset ${fmtT(s.set)}). Prime feeding time.`,0);
   else if(now<s.rise-1.5*H||now>s.set+H) add('w',`Dark (sunrise ${fmtT(s.rise)}). Legal fishing hours apply.`,20);
   else add('w',`Midday. Sunrise ${fmtT(s.rise)}, sunset ${fmtT(s.set)}. Shade and riffles fish best.`,5);
-  if(rain24>0.5) add('w',`${rain24.toFixed(2)} in of rain in 24 h. Expect muddier water.`,5);
   score=Math.max(0,Math.min(100,score));
   const phaseTxt={low:`Low water at ${where}.`,incoming:'Release heading downstream.',rising:'Release arriving.',high:'Release water at the ramp.',falling:'Release water dropping out.'}[phase];
 
@@ -982,6 +984,74 @@ const motorKmh=(water)=>{const m=MOTOR_KMH[TRIP.boat==='jet'?'jet':'prop']; retu
 let CUR_CTX=null;
 const launch=()=>LAUNCHES.find(l=>l.id===TRIP.launch)||LAUNCHES.find(l=>l.id==='medlock');
 
+// ---- Rain stain (measured rain only) ----
+// From 149 storms, Nov 2023 - Nov 2026 (research/rain): stain added above clean water, hours from the start of
+// the rain to the peak, and half-life after the peak, at each river turbidity gauge, by basin rain in inches.
+const RAIN_IN=[0.35,0.75,1.5,3];
+const TURB_GAUGES=[
+  {site:'02334500',name:'Buford (GA 20)',km:5.0,pool:'upper',add:[3.3,9.1,35,218],lag:[11,10,13,19],hl:[2.2,3.4,3.0,6.3]},
+  {site:'02335000',name:'Medlock',km:29.7,pool:'upper',add:[8.8,18.3,52,122],lag:[17,20,29,30],hl:[2.8,3.4,7.4,11.4]},
+  {site:'02335880',name:'Powers Ferry',km:68.5,pool:'lower',add:[9.5,34,99,126],lag:[13,12,17,19],hl:[3.4,8.1,10.3,20]},
+  {site:'02336000',name:'Atlanta (Paces Mill)',km:74.0,pool:'lower',add:[7.1,21,51,106],lag:[14,13,20,38],hl:[4.1,7.6,10.7,14.9]}];
+function rainInterp(arr,inch){
+  if(inch<=RAIN_IN[0]) return arr[0]*Math.max(0.3,inch/RAIN_IN[0]);
+  for(let i=1;i<RAIN_IN.length;i++) if(inch<=RAIN_IN[i]){ const f=(inch-RAIN_IN[i-1])/(RAIN_IN[i]-RAIN_IN[i-1]); return arr[i-1]+(arr[i]-arr[i-1])*f; }
+  return arr[arr.length-1];
+}
+// Basin-average rain by hour, grouped into storms split by 12 dry hours. Storms of 0.2 in or more in the last 4 days.
+function rainEvents(S,now){
+  const t0=+now-5*86400e3, hrs=new Map();
+  for(const site of RAIN_SITES){ const per=new Map();
+    for(const p of (S[site+':00045']||[])) if(+p.t>t0){ const h=Math.floor(+p.t/H); per.set(h,(per.get(h)||0)+p.v); }
+    for(const [h,v] of per){ const o=hrs.get(h)||{s:0,n:0}; o.s+=v; o.n++; hrs.set(h,o); } }
+  const keys=[...hrs.keys()].sort((a,b)=>a-b); if(!keys.length) return [];
+  const ev=[]; let cur=null, dry=0;
+  for(let h=keys[0];h<=keys[keys.length-1];h++){ const o=hrs.get(h), r=o?o.s/o.n:0;
+    if(r>=0.01){ if(!cur) cur={start:h*H,end:h*H+H,inch:0}; cur.end=h*H+H; cur.inch+=r; dry=0; }
+    else if(cur && ++dry>=12){ ev.push(cur); cur=null; dry=0; } }
+  if(cur) ev.push(cur);
+  return ev.filter(e=>e.inch>=0.2 && e.end>+now-96*H).map(e=>({...e,inch:Math.round(e.inch*100)/100}));
+}
+// Each gauge: clean-water level (15th percentile of 14 days), and the stain it measures now beyond clean water and
+// beyond what the release model explains. With rain in the last 4 days that leftover is rain stain: it rises to
+// the storm's typical peak (if the peak hasn't passed) and then fades at the rain half-life. Without rain it is
+// leftover release stain and fades with an 8 h half-life, as before.
+function gaugeStates(S,rel,now,rain){
+  const out=[];
+  for(const g of TURB_GAUGES){
+    const a=S[g.site+':63680']||[], last=a[a.length-1]; if(!last||+now-+last.t>3*H) continue;
+    const wk=a.filter(p=>+p.t>+now-14*86400e3).map(p=>p.v), clean=wk.length?pct(wk,0.15):last.v;
+    let modeled=0; if(g.pool==='upper') for(const r of rel) if(+last.t>+r.on && +last.t<+relOff(r)+30*H) modeled+=relTurb(r,g.km,+last.t,'');
+    const resid=Math.max(0,last.v-clean-modeled), T0=+last.t;
+    const st=rain.length?rain[rain.length-1]:null;
+    let at;
+    if(st){
+      const big=rain.reduce((m,e)=>Math.max(m,e.inch),0), hl=rainInterp(g.hl,big)*H;
+      const peakT=st.start+rainInterp(g.lag,st.inch)*H, A=Math.max(resid,rainInterp(g.add,st.inch));
+      at=t=> T0<peakT ? (t<peakT ? resid+(A-resid)*(t-T0)/(peakT-T0) : A*Math.pow(0.5,(t-peakT)/hl))
+                      : resid*Math.pow(0.5,(t-T0)/hl);
+    } else at=t=>resid*Math.pow(0.5,(t-T0)/(8*H));
+    out.push({...g,clean,resid,v:last.v,T0,at:t=>t<=T0?resid:at(t)});
+  }
+  return out;
+}
+// Blend the two gauges in the same pool that bracket river km `km`
+function gaugeBlend(km,gs,f){
+  const pool=km>=59?'lower':'upper', g=gs.filter(x=>x.pool===pool); if(!g.length) return null;
+  if(g.length===1) return f(g[0]);
+  const [a,b]=g; if(km<=a.km) return f(a); if(km>=b.km) return f(b);
+  const w=(km-a.km)/(b.km-a.km), fa=f(a), fb=f(b);
+  return fa==null?fb:fb==null?fa:fa*(1-w)+fb*w;
+}
+// Measured turbidity at km for a past time: blend the bracketing gauges (the downstream one read at tq, when the
+// water passing km reaches it)
+function measuredTurb(km,t,tq,S){
+  const pool=km>=59?'lower':'upper', g=TURB_GAUGES.filter(x=>x.pool===pool);
+  const [a,b]=g, va=valAt(S[a.site+':63680']||[],Math.min(t,Date.now())), vb=valAt(S[b.site+':63680']||[],tq);
+  if(km>=b.km||va==null) return vb; if(km<=a.km||vb==null) return va;
+  const w=(km-a.km)/(b.km-a.km); return Math.round((va*(1-w)+vb*w)*10)/10;
+}
+
 function stateAt(km,t,ctx){
   // Water at river km `km` at time t: {water, turb, ec, tf}
   const {S,base,now,rel}=ctx, p=prof(km); let water='low', fallF=null;
@@ -1012,6 +1082,8 @@ function stateAt(km,t,ctx){
   const pick=k=>{const a=S[gauge+':'+k]||[];return tq<+now?valAt(a,tq):(a.length?a[a.length-1].v:null)};
   const tc=pick('00010');
   let turb=pick('63680'), ec=pick('99407');
+  const GS=ctx.gauges&&ctx.gauges.length?ctx.gauges:null;
+  if(GS && t<=+now){ const m=measuredTurb(km,t,tq,S); if(m!=null) turb=m; }
   // Forecast hours: release water scours the bed. Measured at Medlock, turbidity rises from about 3 to 9-15 FNU
   // and the E. coli estimate (derived from turbidity) rises about 60%. Past hours use what was actually measured.
   // Future low-water hours: use the river's typical clear-water reading from the last 2 days
@@ -1019,16 +1091,24 @@ function stateAt(km,t,ctx){
   if(tq>=+now && t>+now && (water==='low'||!lower)){
     const base=k=>{const a=(S[gauge+':'+k]||[]).filter(p=>+p.t>+now-48*H).map(p=>p.v); return a.length?pct(a,0.25):null};
     const bt=base('63680'), be=base('99407'); if(bt!=null) turb=bt; if(be!=null) ec=be;
+    const cl=GS?gaugeBlend(km,GS,g=>g.clean):null; if(cl!=null) turb=cl;
   }
   // Above Morgan Falls: add each release's modeled stain (size, turbines, season) on top of the clear-water level
   if(tq>=+now && t>+now && !lower){
     let add=0; for(const r of rel) if(t>+r.on && t<+relOff(r)+30*H) add+=relTurb(r,km,t,water);
     // The leftover stain measured at Medlock is release water moving downstream: upstream spots cleared that much
     // earlier, downstream spots get it later. Shift its age by the difference in settle time from Medlock.
-    if(ctx.turbResid){ const age=t-(ctx.residT||+now)+(prof(MED_KM).settle-prof(km).settle)*H;
+    const rs=GS?gaugeBlend(km,GS,g=>g.at(t)):null;
+    if(rs!=null) add+=rs;
+    else if(ctx.turbResid){ const age=t-(ctx.residT||+now)+(prof(MED_KM).settle-prof(km).settle)*H;
       add+=age<0?ctx.turbResid:ctx.turbResid*Math.pow(0.5,age/(8*H)); }
     if(turb!=null) turb=Math.round((turb+add)*10)/10;
     if(ec!=null) ec=Math.round(ec*(1+0.075*add));
+  }
+  if(tq>=+now && t>+now && lower && GS){
+    // Below Morgan Falls: leftover stain at Powers Ferry / Atlanta (rain or otherwise) fades the same way
+    const rs=gaugeBlend(km,GS,g=>g.at(t)), cl=gaugeBlend(km,GS,g=>g.clean);
+    if(rs!=null&&cl!=null){ turb=Math.round((cl+rs)*10)/10; if(ec!=null&&water==='low') ec=Math.round(ec*(1+0.075*rs)); }
   }
   if(tq>=+now && t>+now && water!=='low' && lower){
     // Below Morgan Falls (Georgia Power turbine schedule): high water stains most, partly raised water less
@@ -1290,7 +1370,7 @@ function renderProjected(ctx,T){
   if(st&&st.ec!=null) R.push([st.ec<235?'g':'b',`E. coli estimate about ${st.ec}/100 mL (${pj}).`]);
   if(st&&st.tf!=null) R.push([st.tf>=45&&st.tf<=65?'g':'w',`Water about ${st.tf.toFixed(0)}°F.`]);
   R.push(['w',`Sunrise ${fmtT(sunT.rise)}, sunset ${fmtT(sunT.set)}.`]);
-  $('reasons').innerHTML=[...notes,...R].map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
+  $('reasons').innerHTML=[...notes,...rainNotes(ctx,T),...R].map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
 }
 // ---- Fish at: project the trip to a chosen time, only as far as release schedules are posted ----
 let FISH_AT=null; // null = now
@@ -1369,7 +1449,7 @@ function renderVerdict(ctx){
   if(tr.score!=null&&!notes.length&&tr.flags.wade) notes.push(['g',`Steady, safe water at the ramp for your whole ${fmtDur(TRIP.float)} session.`]);
   if(tr.score!=null&&!notes.length&&tr.flags.drift) notes.push(['g',`Clean drift to ${tr.flags.to}. No release water reaches you.`]);
   if(tr.score!=null&&!notes.length) notes.push(['g',launch().id==='dam'?`Clean ${fmtDur(TRIP.float)} float and an easy run back to the dam. No release water reaches you.`:`Clear run up and a clean ${fmtDur(TRIP.float)} float. No release water reaches you.`]);
-  $('reasons').innerHTML=[...notes,...R].map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
+  $('reasons').innerHTML=[...notes,...rainNotes(ctx),...R].map(([c,t])=>`<li><i class="dot ${c}"></i><span>${t}</span></li>`).join('');
 }
 
 function buildCtx(){
@@ -1377,6 +1457,7 @@ function buildCtx(){
   const sched=schedReleases();
   const rel=[...ev.map(e=>({...e,src:'gauge'})), ...sched.filter(s=>!ev.some(e=>Math.abs(e.on-s.on)<2*H))];
   const c={S,base,baseAtl,now,rel,sched,ev,turbResid:0}; CUR_CTX=c;
+  try{ c.rain=rainEvents(S,now); c.gauges=gaugeStates(S,rel,now,c.rain); }catch(e){ console.error(e); c.rain=[]; c.gauges=[]; }
   // Anchor projections to what Medlock measures now: any stain beyond what the release model explains
   // (e.g. a slow-clearing fall release) carries forward and fades with an 8 h half-life, erring muddy.
   try{
@@ -1410,6 +1491,46 @@ function fullScore(T,ctx){
   const tr=tripScore(T,ctx,sunT), f=fishQ(T,launch().km,ctx,sunT), cond=f&&!f.dark?f.q:0;
   return {T, score:tr.score==null?cond:tr.score, tr, st:f&&f.s};
 }
+// ---- Rain notes: measured storms (scored) and forecast rain (noted only, never scored) ----
+function rainNotes(ctx,T){
+  const out=[], L=launch(), st=ctx.rain&&ctx.rain.length?ctx.rain[ctx.rain.length-1]:null, GS=ctx.gauges||[];
+  if(st){
+    const when=new Date(st.start), dl=when.toDateString()===new Date().toDateString()?'today':when.toLocaleDateString([], {weekday:'long'});
+    const pool=L.km>=59?'lower':'upper';
+    let txt=`${st.inch.toFixed(2)} in of rain ${dl} from ${fmtT(when)} (average of ${RAIN_SITES.length} USGS rain gauges).`;
+    if(GS.some(g=>g.pool===pool)){
+      const from=Math.max(+ctx.now,T||0), stain=t=>gaugeBlend(L.km,GS,g=>g.clean+g.at(t));
+      const ser=[]; for(let t=from;t<=from+5*86400e3;t+=30*60e3){ const v=stain(t); if(v==null) break; ser.push([t,v]); }
+      let pk=null,pkT=null,u10=null,u5=null;
+      for(const [t,v] of ser) if(pk==null||v>pk){pk=v;pkT=t;}
+      for(const [t,v] of ser) if(t>=pkT){ if(u10==null&&v<10) u10=t; if(u5==null&&v<5){ u5=t; break; } }
+      const nm=SHORT[L.id]||L.name, d=t=>fmtDT(new Date(Math.round(t/9e5)*9e5));
+      if(pk!=null){
+        if(pkT>from+H) txt+=` Rain stain at ${nm} should peak near ${Math.round(pk)} FNU about ${d(pkT)}`;
+        else txt+=` Rain stain at ${nm} is about ${Math.round(pk)} FNU and fading`;
+        txt+= u5&&u5<=from+30*60e3?'; it has cleared.' : `${u10&&pk>=10?`, under 10 FNU (fishable) about ${d(u10)}`:''}${u5?`, under 5 FNU (clear) about ${d(u5)}`:''}.`;
+      }
+      out.push([pk!=null&&pk>=10?'b':'w',txt]);
+    } else out.push(['w',txt]);
+  }
+  const fc=FORECAST&&FORECAST.first;
+  if(fc&&fc.t>+ctx.now) out.push(['w',`Rain in the forecast from ${fmtDT(new Date(fc.t))} (up to ${fc.pop}% chance, National Weather Service). Scores don’t count stain from rain that hasn’t fallen yet; rain usually stains the river for 1 to 3 days.`]);
+  return out;
+}
+// National Weather Service hourly forecast for the river (Medlock). Checked at most once an hour.
+let FORECAST=null;
+async function loadForecast(){
+  try{ const c=JSON.parse(localStorage.getItem('nwsFc')||'null'); if(c&&Date.now()-c.at<H){ FORECAST=c; return; } }catch(e){}
+  try{
+    const pt=await (await fetch('https://api.weather.gov/points/33.9972,-84.2019')).json();
+    const fc=await (await fetch(pt.properties.forecastHourly)).json();
+    const per=(fc.properties.periods||[]).filter(p=>+new Date(p.endTime)>Date.now() && +new Date(p.startTime)<Date.now()+72*H);
+    const wet=per.filter(p=>(p.probabilityOfPrecipitation&&p.probabilityOfPrecipitation.value||0)>=40);
+    FORECAST={at:Date.now(),first:wet.length?{t:Math.max(Date.now(),+new Date(wet[0].startTime)),pop:Math.max(...wet.map(p=>p.probabilityOfPrecipitation.value))}:null};
+    try{localStorage.setItem('nwsFc',JSON.stringify(FORECAST))}catch(e){}
+  }catch(e){ console.warn('NWS forecast unavailable',e); }
+}
+
 function renderBest(ctx){
   const L=launch(), step=15*60e3, now=Date.now(), h=+horizon(L);
   const t0=Math.ceil(now/step)*step;
@@ -1447,6 +1568,7 @@ function renderBest(ctx){
   $('best').innerHTML=`<div class="bestTop"><span class="when">${dayLbl(b.T)} ${fmtT(new Date(b.T))}</span><span class="sc" style="background:${col(b.score)}">Score ${b.score}</span><button type="button" data-t="${b.T}">${BAD?'See this time':'Plan this time'}</button></div>
     ${BAD?`<p class="status">Nothing scores 70 or better through ${hd}. This is the least bad time, and conditions are poor:</p>`:''}
     ${span?`<p class="status">${span}</p>`:''}
+    ${rainNotes(ctx,b.T).map(([c,t])=>`<p class="status"><i class="dot ${c}"></i> ${t}</p>`).join('')}
     <ul class="bestWhy">${why.map(t=>`<li>${t}</li>`).join('')}</ul>
     ${alts.length?`<p class="foot">Other good times</p><div class="bestAlt">${alts.map(w=>`<button type="button" data-t="${w.best.T}">${dayLbl(w.best.T)} ${fmtT(new Date(w.best.T))} · ${w.best.score}</button>`).join('')}</div>`:''}
     <p class="foot">Searched every 15 minutes from now through ${hd}, the end of the posted Corps schedule, for your ${TRIP.boat==='wade'?`${fmtDur(TRIP.float)} wading session`:`${fmtDur(TRIP.motor/60+TRIP.float)} trip (${TRIP.motor} min up, ${fmtDur(TRIP.float)} back)`}. Scores weigh water level, turbidity, temperature, every release before and after, and time of day (midday scores a little lower, most in summer).</p>`;
@@ -1564,8 +1686,9 @@ route();
 window.addEventListener('hashchange',()=>{route();window.scrollTo(0,0)});
 $('refresh').addEventListener('click',()=>{loadSchedule().then(()=>LAST?render(LAST.S):renderWindows());load(true)});
 loadSchedule().then(()=>LAST?render(LAST.S):renderWindows());
+loadForecast().then(()=>{ if(LAST) renderWindows(); });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden) load()});
-setInterval(()=>{if(!document.hidden) load()},10*60e3);
+setInterval(()=>{if(!document.hidden){ load(); loadForecast().then(()=>{ if(LAST) renderWindows(); }); }},10*60e3);
 load();
 </script>
 </body>

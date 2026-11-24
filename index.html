@@ -277,7 +277,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
     <h2 id="mapTitle">Where the good water is</h2>
     <p class="foot">Each row is a spot on the river, top is the dam, and each column is 15 minutes. Blue is release water moving downstream; green is good fishing water. With a fast boat, stay in the green: fish ahead of the blue band, then run back up behind it. Below Morgan Falls Dam, past hours use the Atlanta gauge’s readings and future hours follow Georgia Power’s Morgan Falls turbine schedule (2+ units shows as release water, 1 unit as partly raised). Tap the map for details.</p>
     <div class="maptools"><div class="legend2"><span><i style="background:var(--good)"></i>Good water</span><span><i style="background:var(--warn)"></i>So-so</span><span><i style="background:var(--bad)"></i>Poor</span><span><i style="background:var(--river)"></i>Release water</span><span><i style="background:color-mix(in srgb,var(--river) 45%,var(--panel))"></i>Rising or falling</span><span><i class="hatch"></i>Stained, 10+ FNU</span><span><i class="hatch mud"></i>Muddy, 20+ FNU</span></div><button type="button" class="xbtn" data-zoom="rmap" aria-label="Enlarge the good-water map">⤢ Enlarge</button></div>
-    <p class="turbguide">Turbidity for trout: <b>under 5 FNU</b> clear, good fishing · <b>5–10</b> light stain, fishable · <b>10–20</b> stained, poor · <b>20+</b> muddy, very poor.</p>
+    <p class="turbguide">Turbidity for trout: <b>under 3 FNU</b> clear, good fishing · <b>3–10</b> stain building, fishing drops off steadily · <b>10+</b> stained or muddy, not worth going.</p>
     <div class="mapwrap"><svg id="rmap" class="rmap" viewBox="0 0 640 440" width="100%" role="img" aria-label="Fishing quality by river location and time of day"></svg><div class="readout mapRead" id="mapRead" hidden></div></div>
   </section>
 
@@ -317,7 +317,7 @@ th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;le
 <script>
 const LAT=33.998, LON=-84.200;
 // Turbidity bands for trout fishing (FNU): one definition used by scores, tiles, notes and the map
-const TURB_BANDS=[{max:5,c:'g',name:'Clear',fish:'good fishing'},{max:10,c:'w',name:'Light stain',fish:'fishable'},{max:20,c:'b',name:'Stained',fish:'poor fishing'},{max:Infinity,c:'b',name:'Muddy',fish:'very poor fishing'}];
+const TURB_BANDS=[{max:3,c:'g',name:'Clear',fish:'good fishing'},{max:6,c:'w',name:'Slight stain',fish:'fishing starts to drop off'},{max:10,c:'w',name:'Light stain',fish:'poor fishing'},{max:20,c:'b',name:'Stained',fish:'not worth going'},{max:Infinity,c:'b',name:'Muddy',fish:'not worth going'}];
 const turbBand=v=>TURB_BANDS.find(b=>v<b.max);
 const SITES={dam:'02334430',settles:'02334653',med:'02335000',atl:'02336000',buf:'02334500',pow:'02335880'};
 // USGS rain gauges along the reach (basin average): Medlock, Suwanee Cr, Crooked Cr, Big Cr, Morgan Falls, Powers Ferry
@@ -477,10 +477,9 @@ function render(S){
     rising:()=>add('b','Water is rising now. Not safe for wading.',45),
     high:()=>add('b','High release water. Boat or bank only. Fish slow edges and eddies.',35),
     falling:()=>add('w','Water still dropping after a release. Fishing improves as it settles and clears.',12)})[phase]();
-  if(tu){ if(tu.v<5) add('g',`Clear water (${tu.v} FNU): good fishing. Go light and natural.`,0);
-    else if(tu.v<10) add('w',`Light stain (${tu.v} FNU): fishable. Use bigger, brighter patterns.`,10);
-    else if(tu.v<20) add('b',`Stained (${tu.v} FNU): poor fishing. Streamers and worms work best.`,25);
-    else add('b',`Muddy (${tu.v} FNU): very poor fishing. Likely runoff.`,40); }
+  if(tu){ if(tu.v<=3) add('g',`Clear water (${tu.v} FNU): good fishing. Go light and natural.`,0);
+    else if(tu.v<10) add('w',`${turbBand(tu.v).name} (${tu.v} FNU): ${turbBand(tu.v).fish}. Use bigger, brighter patterns.`,Math.round(50*(tu.v-3)/7));
+    else add('b',`${turbBand(tu.v).name} (${tu.v} FNU): not worth going.`,50); }
   if(ec){ if(ec.v<235) add('g',`E. coli estimate ${ec.v}/100 mL, under the 235 swimming limit.`,0);
     else if(ec.v<1000) add('w',`E. coli estimate ${ec.v}/100 mL, over 235. Limit skin contact, wash hands.`,10);
     else add('b',`E. coli estimate ${ec.v}/100 mL. Avoid contact with the water.`,25); }
@@ -708,7 +707,7 @@ function driftPage(){
   if(r.hit) N.push(['w',`Release water catches you about ${fmtT(new Date(r.hit.t))}, ${(r.hit.km/1.609).toFixed(1)} mi below the dam. Your drift speeds up and the water stains.`]);
   if(!r.hit&&r.hiShare>=0.25) N.push(['b',`You’d be on release water for ${Math.round(r.hiShare*100)}% of the drift.`]);
   if(r.dark&&r.hours<=light) N.push(['w','The drift runs outside legal fishing hours (30 min before sunrise to 30 min after sunset).']);
-  if(r.muddy) N.push(['w','Stained water (10+ FNU, poor fishing) for part of the drift.']);
+  if(r.muddy) N.push(['w','Stained water (10+ FNU, not worth fishing) for part of the drift.']);
   if(r.ecHi) N.push(['w','E. coli estimate over 235 for part of the drift. Limit skin contact.']);
   if(to.id==='overlook') N.push(['w','The last stretch into Morgan Falls is slow reservoir water, so expect a longer drift than shown.']);
   if(!N.length) N.push(['g','Clean drift: no release water, clear water, inside legal hours.']);
@@ -1161,8 +1160,9 @@ function fishQ(t,km,ctx,sunT){
   if(t<+sunT.rise-30*60e3||t>+sunT.set+30*60e3) return {q:0,dark:true};
   const s=stateAt(km,t,ctx); if(!s) return null;
   let q = s.water==='low'?60 : s.water==='falling'?Math.round(30+30*Math.min(1,Math.max(0,s.fallF??0.5))) : s.water==='caution'?40 : 15;
-  // Turbidity: smooth, no cliffs at band edges (3 FNU +15, 5 +8, 10 -5, 20 -25, 40+ -40)
-  const tq=s.turb==null?null:(v=>{const P=[[0,15],[3,15],[5,8],[10,-5],[20,-25],[40,-40]]; if(v>=40) return -40; const i=P.findIndex(p=>p[0]>=v); if(i<=0) return 15; const [x0,y0]=P[i-1],[x1,y1]=P[i]; return y0+(y1-y0)*(v-x0)/(x1-x0);})(s.turb);
+  // Turbidity (Nate, 2026-11-24): 3 FNU or under is clear (+15). Fishing degrades steadily from 3 to 10 FNU, and
+  // 10+ isn't worth going out for: a flat peak penalty (-25), so even ideal water otherwise scores 50 at most.
+  const tq=s.turb==null?null:(s.turb<=3?15:s.turb>=10?-25:15-40*(s.turb-3)/7);
   if(tq!=null) q+=tq;
   if(s.tf!=null) q+= s.tf>68?-40: s.tf>65?-10: s.tf<45?-10:5;
   if(s.ec!=null && s.ec>=235) q-=10;
@@ -1503,12 +1503,12 @@ function rainNotes(ctx,T){
       const ser=[]; for(let t=from;t<=from+5*86400e3;t+=30*60e3){ const v=stain(t); if(v==null) break; ser.push([t,v]); }
       let pk=null,pkT=null,u10=null,u5=null;
       for(const [t,v] of ser) if(pk==null||v>pk){pk=v;pkT=t;}
-      for(const [t,v] of ser) if(t>=pkT){ if(u10==null&&v<10) u10=t; if(u5==null&&v<5){ u5=t; break; } }
+      for(const [t,v] of ser) if(t>=pkT){ if(u10==null&&v<10) u10=t; if(u5==null&&v<=3){ u5=t; break; } }
       const nm=SHORT[L.id]||L.name, d=t=>fmtDT(new Date(Math.round(t/9e5)*9e5));
       if(pk!=null){
         if(pkT>from+H) txt+=` Rain stain at ${nm} should peak near ${Math.round(pk)} FNU about ${d(pkT)}`;
         else txt+=` Rain stain at ${nm} is about ${Math.round(pk)} FNU and fading`;
-        txt+= u5&&u5<=from+30*60e3?'; it has cleared.' : `${u10&&pk>=10?`, under 10 FNU (fishable) about ${d(u10)}`:''}${u5?`, under 5 FNU (clear) about ${d(u5)}`:''}.`;
+        txt+= u5&&u5<=from+30*60e3?'; it has cleared.' : `${u10&&pk>=10?`, under 10 FNU (worth fishing again) about ${d(u10)}`:''}${u5?`, 3 FNU or under (clear) about ${d(u5)}`:''}.`;
       }
       out.push([pk!=null&&pk>=10?'b':'w',txt]);
     } else out.push(['w',txt]);
